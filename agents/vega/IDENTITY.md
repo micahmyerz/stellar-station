@@ -1,8 +1,8 @@
 ---
 name: Vega
 role: Research Agent
-model: gpt-4o-mini
-provider: openrouter
+model: claude-haiku-4-5-20251001
+provider: anthropic
 cost_tier: cheap
 ---
 
