@@ -149,18 +149,27 @@ def cmd_orders_list():
     print(json.dumps(result, indent=2))
 
 def cmd_analytics_traffic():
-    """Get traffic analytics (mock for now)"""
+    """Traffic/session analytics.
+
+    The Shopify Admin API does NOT expose visit/session/conversion data — that
+    lives in a separate analytics layer (Microsoft Clarity, GA4, or Shopify's
+    ShopifyQL/Analytics API). No such source is wired in yet, so this command
+    returns an explicit 'unavailable' instead of inventing numbers.
+    DO NOT estimate or fabricate traffic figures from this output.
+    """
     result = {
-        'period': 'last_7_days',
-        'sessions': 1247,
-        'unique_visitors': 892,
-        'page_views': 3521,
-        'conversion_rate': 2.4,
-        'top_pages': [
-            {'url': '/products/kegel-exercise-weight', 'views': 523},
-            {'url': '/products/pelvic-floor-kit', 'views': 412},
-            {'url': '/', 'views': 1103}
-        ]
+        'status': 'unavailable',
+        'data_source': None,
+        'reason': ('No analytics/traffic source is connected. The Shopify Admin '
+                   'API does not provide sessions, visitors, or conversion rate.'),
+        'sessions': None,
+        'unique_visitors': None,
+        'page_views': None,
+        'conversion_rate': None,
+        'top_pages': None,
+        'how_to_enable': ('Connect Microsoft Clarity (free) or GA4 and wire its '
+                          'export API into this command. Until then, traffic '
+                          'cannot be reported and must not be estimated.')
     }
     print(json.dumps(result, indent=2))
 
