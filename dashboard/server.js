@@ -47,6 +47,11 @@ app.get('/api/status', (req, res) => {
     });
 });
 
+// Living Station page - real-time agent activity
+app.get('/station', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views', 'station-live.html'));
+});
+
 // Old Phaser dashboard (archived)
 app.get('/dashboard-phaser', (req, res) => {
     try {
