@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= filename %> - Stellar Station</title>
+    <link rel="stylesheet" href="/css/retro.css">
+</head>
+<body>
+    <div class="crt">
+        <header class="pixel-border">
+            <h1 class="glow">📡 WAR ROOM INTEL</h1>
+            <p class="subtitle"><a href="/" class="btn-link">← BACK TO MISSION CONTROL</a></p>
+        </header>
+
+        <section class="pixel-border green">
+            <h2 class="section-title"><%= filename %></h2>
+            <pre style="color: var(--green); font-size: 8px; overflow-x: auto; white-space: pre-wrap;"><%= content %></pre>
+        </section>
+
+        <footer class="pixel-border">
+            <p><a href="/" class="btn-link">← RETURN TO MISSION CONTROL</a></p>
+        </footer>
+    </div>
+
+    <script src="/js/retro.js"></script>
+</body>
+</html>

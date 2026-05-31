@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stellar Station — Command Interface</title>
+
+<!--
+  ────────────────────────────────────────────────────────────────
+  STELLAR STATION DASHBOARD
+  The room images are referenced by the filenames you uploaded.
+  Put this HTML file in the SAME folder as your art, OR change the
+  ASSET_DIR value just below to point at wherever they live
+  (e.g. "/static/rooms/" on your server).
+  Expected files:
+    hero-bg.png, room-atlas.png, room-vega.png, room-nova.png,
+    room-pulsar.png, room-lyra.png, room-warroom.png
+  ────────────────────────────────────────────────────────────────
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --asset-dir: "";                 /* set via JS below if you prefer */
+    --bg-0:#070611;
+    --bg-1:#0d0a1f;
+    --panel:#0c0a1aee;
+    --panel-line:#2a2150;
+    --hull:#171132;
+    --ink:#d7d2f5;
+    --ink-dim:#8b86b8;
+    --grid-gap:18px;
+
+    /* per-room accents, matched to each room's art */
+    --atlas:#37cdff;
+    --vega:#3dffb0;
+    --nova:#ff4fd8;
+    --pulsar:#5dff6a;
+    --lyra:#ffc23d;
+    --warroom:#ff3d7f;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    font-family:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+    color:var(--ink);
+    background:
+      radial-gradient(1200px 700px at 80% -10%, #2a1b5533 0, transparent 60%),
+      radial-gradient(900px 600px at -10% 110%, #15324d44 0, transparent 60%),
+      linear-gradient(160deg, var(--bg-1), var(--bg-0));
+    background-attachment:fixed;
+    min-height:100%;
+  }
+  /* hero art as a dim, atmospheric backdrop */
+  body::before{
+    content:"";
+    position:fixed; inset:0;
+    background-image: var(--hero);
+    background-size:cover; background-position:center;
+    image-rendering:pixelated;
+    opacity:.10;
+    filter:saturate(1.2);
+    pointer-events:none;
+    z-index:0;
+  }
+  /* faint scanlines for the cyberdeck feel */
+  body::after{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:1;
+    background:repeating-linear-gradient(to bottom, #0000 0 3px, #00000022 3px 4px);
+    mix-blend-mode:overlay; opacity:.5;
+  }
+
+  .wrap{ position:relative; z-index:2; max-width:1280px; margin:0 auto; padding:22px clamp(14px,3vw,34px) 40px; }
+
+  /* ── Top bar ─────────────────────────────────── */
+  .topbar{ display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap; }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand .star{ color:var(--lyra); font-size:22px; filter:drop-shadow(0 0 8px var(--lyra)); }
+  .brand h1{
+    font-family:"Press Start 2P", "JetBrains Mono", monospace;
+    font-size:clamp(13px,2.1vw,18px); letter-spacing:1px; margin:0;
+    color:#fff; text-shadow:0 0 14px #6f5bff88;
+  }
+  .controls{ display:flex; gap:10px; }
+  .ctl{
+    font-family:inherit; font-weight:700; font-size:11px; letter-spacing:1.5px;
+    color:#1a1530; background:var(--lyra); border:0; padding:9px 14px; cursor:pointer;
+    clip-path:polygon(0 0,100% 0,100% 70%,92% 100%,0 100%);
+    transition:transform .12s ease, filter .12s ease;
+  }
+  .ctl[aria-pressed="false"]{ background:#241c47; color:var(--ink-dim); box-shadow:inset 0 0 0 1px var(--panel-line); }
+  .ctl:hover{ transform:translateY(-1px); filter:brightness(1.08); }
+
+  /* ── Main frame: console rail + station grid ──── */
+  .frame{ display:grid; grid-template-columns:266px 1fr; gap:var(--grid-gap); align-items:start; }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--panel-line);
+    border-radius:12px;
+    box-shadow:0 0 0 1px #ffffff08 inset, 0 18px 40px #00000066;
+    backdrop-filter:blur(3px);
+  }
+
+  /* console rail */
+  .console{ padding:16px; position:sticky; top:18px; }
+  .console h2{
+    font-size:11px; letter-spacing:2px; color:var(--ink-dim);
+    margin:0 0 12px; border-bottom:1px dashed var(--panel-line); padding-bottom:10px;
+  }
+  .stat{ display:flex; justify-content:space-between; align-items:baseline; padding:7px 0; }
+  .stat .k{ color:var(--ink-dim); font-size:12px; letter-spacing:1px; }
+  .stat .v{ font-size:20px; font-weight:700; color:#fff; }
+  .stat .v.active{ color:var(--pulsar); text-shadow:0 0 10px var(--pulsar); }
+  .roster{ margin-top:14px; border-top:1px dashed var(--panel-line); padding-top:12px; }
+  .agent{ display:flex; align-items:center; gap:9px; padding:6px 0; font-size:12px; letter-spacing:.5px; }
+  .agent .nm{ color:var(--ink); flex:1; }
+  .agent .st{ color:var(--ink-dim); font-size:10px; letter-spacing:1px; }
+  .led{ width:9px; height:9px; border-radius:50%; background:var(--c); box-shadow:0 0 8px var(--c); flex:none; }
+  .agent.idle .led{ animation:pulse 2.6s ease-in-out infinite; }
+  @keyframes pulse{ 0%,100%{opacity:.35} 50%{opacity:1} }
+
+  /* station grid — THIS is what guarantees alignment */
+  .station{ display:grid; grid-template-columns:repeat(3,1fr); gap:var(--grid-gap); }
+
+  .room{
+    position:relative; display:block; width:100%; aspect-ratio:1/1;
+    border:0; padding:0; cursor:pointer; overflow:hidden; border-radius:12px;
+    background: #120e26; /* fallback so it never looks "broken" before art loads */
+    box-shadow:0 0 0 1px var(--panel-line), 0 14px 30px #00000055;
+    outline:none; isolation:isolate;
+    animation:rise .5s cubic-bezier(.2,.8,.2,1) backwards;
+  }
+  .station .room:nth-child(1){ animation-delay:.02s }
+  .station .room:nth-child(2){ animation-delay:.07s }
+  .station .room:nth-child(3){ animation-delay:.12s }
+  .station .room:nth-child(4){ animation-delay:.17s }
+  .station .room:nth-child(5){ animation-delay:.22s }
+  .station .room:nth-child(6){ animation-delay:.27s }
+  @keyframes rise{ from{ opacity:0; transform:translateY(14px) } to{ opacity:1; transform:none } }
+
+  .room .art{
+    position:absolute; inset:0;
+    background-image:var(--img);
+    background-size:cover; background-position:center;
+    image-rendering:pixelated;
+    /* themed glow underlay shows through if the image is missing */
+    box-shadow:inset 0 0 120px -20px var(--accent);
+    transition:transform .35s ease;
+  }
+  .room::before{ /* accent frame */
+    content:""; position:absolute; inset:0; z-index:3; pointer-events:none;
+    border-radius:12px; box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  .room:hover .art{ transform:scale(1.04); }
+  .room:hover{ box-shadow:0 0 0 1px var(--accent), 0 0 26px -4px var(--accent), 0 16px 34px #00000066; }
+  .room:focus-visible{ box-shadow:0 0 0 2px var(--accent); }
+
+  .label{
+    position:absolute; left:0; right:0; top:0; z-index:4;
+    display:flex; align-items:center; gap:8px;
+    padding:9px 11px;
+    background:linear-gradient(to bottom, #060512ee, #06051200);
+    font-size:11px; font-weight:700; letter-spacing:1.4px;
+    color:#fff; text-shadow:0 1px 3px #000;
+  }
+  .label .dot{ width:8px; height:8px; border-radius:50%; background:var(--accent); box-shadow:0 0 9px var(--accent); flex:none; }
+  .label .room-name{ color:color-mix(in srgb, var(--accent) 78%, #fff); }
+
+  .meta{
+    position:absolute; left:0; right:0; bottom:0; z-index:4;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:9px 11px;
+    background:linear-gradient(to top, #060512f2, #06051200);
+    font-size:10px; letter-spacing:1px;
+  }
+  .meta .role{ color:var(--ink-dim); text-transform:uppercase; }
+  .badge{ padding:3px 8px; border-radius:999px; font-weight:700; font-size:9px; letter-spacing:1.2px;
+    color:#0a0814; background:var(--accent); box-shadow:0 0 10px -2px var(--accent); }
+  .badge.idle{ background:#2b2450; color:var(--ink-dim); box-shadow:none; }
+
+  /* Stats-only mode: hide the art, keep the framed data panels aligned */
+  body.stats-only .room .art{ opacity:.06; filter:grayscale(.6); transform:none; }
+  body.stats-only .room{ background:linear-gradient(160deg,#14102b,#0b0820); }
+
+  /* ── Lightbox ─────────────────────────────────── */
+  .lightbox{ position:fixed; inset:0; z-index:50; display:none; place-items:center;
+    background:#04030bdd; backdrop-filter:blur(6px); padding:24px; }
+  .lightbox.open{ display:grid; animation:fade .2s ease; }
+  @keyframes fade{ from{opacity:0} to{opacity:1} }
+  .lightbox figure{ margin:0; max-width:min(86vw,720px); }
+  .lightbox img{ width:100%; height:auto; image-rendering:pixelated;
+    border-radius:14px; box-shadow:0 0 0 2px var(--lb-accent,#fff), 0 0 60px -10px var(--lb-accent,#fff); }
+  .lightbox figcaption{ margin-top:14px; text-align:center; font-family:"Press Start 2P",monospace;
+    font-size:12px; letter-spacing:1px; color:var(--lb-accent,#fff); text-shadow:0 0 12px var(--lb-accent,#fff); }
+  .lightbox .hint{ display:block; margin-top:10px; font-family:"JetBrains Mono",monospace;
+    font-size:10px; letter-spacing:1px; color:var(--ink-dim); }
+
+  /* ── Live store readout ───────────────────────── */
+  .store{ border-top:1px dashed var(--panel-line); padding-top:12px; margin-top:14px; }
+  .store h2{ border:0; padding:0; margin:0 0 10px; display:flex; align-items:center; gap:8px; }
+  .store-flag{ font-size:9px; letter-spacing:1px; padding:2px 7px; border-radius:999px;
+    background:#2b2450; color:var(--ink-dim); }
+  .store-flag.live{ background:var(--pulsar); color:#06120a; box-shadow:0 0 10px -2px var(--pulsar); }
+  .store-flag.err{ background:var(--warroom); color:#1a0410; }
+  .store-top{ margin-top:10px; font-size:11px; color:var(--ink-dim); line-height:1.5; }
+  .store-top b{ color:#fff; font-weight:600; display:block; }
+
+  /* ── Responsive ───────────────────────────────── */
+  @media (max-width:880px){
+    .frame{ grid-template-columns:1fr; }
+    .console{ position:static; }
+    .station{ grid-template-columns:repeat(2,1fr); }
+  }
+  @media (max-width:520px){
+    .station{ grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="topbar">
+    <div class="brand"><span class="star">★</span><h1>STELLAR STATION</h1></div>
+    <div class="controls">
+      <button class="ctl" id="btn-data" aria-pressed="true">DATA VIEW</button>
+      <button class="ctl" id="btn-stats" aria-pressed="false">STATS ONLY</button>
+    </div>
+  </header>
+
+  <div class="frame">
+    <!-- console rail -->
+    <aside class="panel console">
+      <h2>◇ STATION STATUS</h2>
+      <div class="stat"><span class="k">TASKS</span><span class="v" id="s-tasks">9</span></div>
+      <div class="stat"><span class="k">COMPLETED</span><span class="v" id="s-done">6</span></div>
+      <div class="stat"><span class="k">ACTIVE</span><span class="v active" id="s-active">0</span></div>
+
+      <div class="roster" id="roster"><!-- agents injected by JS --></div>
+
+      <div class="store">
+        <h2>◇ LIVE STORE <span class="store-flag" id="store-flag">…</span></h2>
+        <div class="stat"><span class="k">PRODUCTS</span><span class="v" id="st-products">—</span></div>
+        <div class="stat"><span class="k">ORDERS 30D</span><span class="v" id="st-orders">—</span></div>
+        <div class="stat"><span class="k">REVENUE 30D</span><span class="v" id="st-revenue">—</span></div>
+        <div class="store-top" id="st-top"></div>
+      </div>
+    </aside>
+
+    <!-- station grid -->
+    <main class="station" id="station"><!-- rooms injected by JS --></main>
+  </div>
+</div>
+
+<!-- lightbox -->
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true">
+  <figure>
+    <img id="lb-img" alt="" />
+    <figcaption id="lb-cap"></figcaption>
+    <span class="hint">click anywhere or press ESC to close</span>
+  </figure>
+</div>
+
+<script>
+  // ── Configure where your art lives (leave "" if next to this file) ──
+  const ASSET_DIR = "/rooms/";  // e.g. "/static/rooms/"
+
+  // ── Room + agent data (wire these to your real task queue later) ──
+  const ROOMS = [
+    { id:"atlas",   name:"ATLAS COMMAND",     role:"Manager",     img:"room-atlas.png",   accent:"var(--atlas)",   status:"IDLE", agent:true },
+    { id:"vega",    name:"VEGA RESEARCH LAB", role:"Research",    img:"room-vega.png",    accent:"var(--vega)",    status:"IDLE", agent:true },
+    { id:"nova",    name:"NOVA MARKETING",    role:"Marketing",   img:"room-nova.png",    accent:"var(--nova)",    status:"IDLE", agent:true },
+    { id:"pulsar",  name:"PULSAR ANALYTICS",  role:"Analytics",   img:"room-pulsar.png",  accent:"var(--pulsar)",  status:"IDLE", agent:true },
+    { id:"lyra",    name:"LYRA COPYWRITING",  role:"Copywriting", img:"room-lyra.png",    accent:"var(--lyra)",    status:"IDLE", agent:true },
+    { id:"warroom", name:"WAR ROOM",          role:"Strategy",    img:"room-warroom.png", accent:"var(--warroom)", status:"STANDBY", agent:false },
+  ];
+
+  // hero backdrop
+  document.documentElement.style.setProperty("--hero", `url("${ASSET_DIR}hero-bg.png")`);
+
+  // build station grid
+  const station = document.getElementById("station");
+  station.innerHTML = ROOMS.map(r => `
+    <button class="room" data-id="${r.id}" style="--accent:${r.accent}; --img:url('${ASSET_DIR}${r.img}')">
+      <div class="art" role="img" aria-label="${r.name}"></div>
+      <div class="label"><span class="dot"></span><span class="room-name">${r.name}</span></div>
+      <div class="meta">
+        <span class="role">${r.role}</span>
+        <span class="badge ${r.status==="IDLE"?"idle":""}">${r.status}</span>
+      </div>
+    </button>
+  `).join("");
+
+  // build agent roster (only the 5 working agents, War Room is a room, not an agent)
+  const roster = document.getElementById("roster");
+  roster.innerHTML = ROOMS.filter(r=>r.agent).map(r => `
+    <div class="agent ${r.status.toLowerCase()}" style="--c:${r.accent}">
+      <span class="led"></span><span class="nm">${r.name.split(" ")[0]}</span><span class="st">${r.status}</span>
+    </div>
+  `).join("");
+
+  // ── Controls: Data View / Stats Only ──
+  const btnData = document.getElementById("btn-data");
+  const btnStats = document.getElementById("btn-stats");
+  function setMode(statsOnly){
+    document.body.classList.toggle("stats-only", statsOnly);
+    btnStats.setAttribute("aria-pressed", String(statsOnly));
+    btnData.setAttribute("aria-pressed", String(!statsOnly));
+  }
+  btnData.onclick = ()=>setMode(false);
+  btnStats.onclick = ()=>setMode(true);
+
+  // ── Lightbox (click a room to view full-size) ──
+  const lb = document.getElementById("lightbox");
+  const lbImg = document.getElementById("lb-img");
+  const lbCap = document.getElementById("lb-cap");
+  station.addEventListener("click", e => {
+    const btn = e.target.closest(".room"); if(!btn) return;
+    const r = ROOMS.find(x => x.id === btn.dataset.id);
+    lbImg.src = ASSET_DIR + r.img; lbImg.alt = r.name;
+    lbCap.textContent = r.name;
+    lb.style.setProperty("--lb-accent", getComputedStyle(btn).getPropertyValue("--accent").trim());
+    lb.classList.add("open");
+  });
+  lb.addEventListener("click", ()=> lb.classList.remove("open"));
+  document.addEventListener("keydown", e => { if(e.key==="Escape") lb.classList.remove("open"); });
+
+  // ── Live store stats (real Shopify data via your stellar-api) ──
+  // SECURITY: the browser NEVER sees the Shopify token. It only calls your own
+  // API, which holds the token server-side and talks to Shopify.
+  // STATS_URL is same-origin by default. If your dashboard (:3000) and API
+  // (:3001) are SEPARATE origins, set this to the full URL
+  // (e.g. "http://2.24.126.194:3001/store-stats") and enable CORS on that route,
+  // OR proxy /store-stats from the :3000 server to :3001.
+  const STATS_URL = "http://2.24.126.194:3001/store-stats";
+
+  const flag = document.getElementById("store-flag");
+  function fmtMoney(n, cur){
+    if (n == null) return "—";
+    try { return new Intl.NumberFormat(undefined, { style:"currency", currency: cur || "USD" }).format(n); }
+    catch { return (cur || "$") + " " + n; }
+  }
+  async function loadStoreStats(){
+    try {
+      const r = await fetch(STATS_URL, { cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const d = await r.json();
+      document.getElementById("st-products").textContent = d.productCount ?? "—";
+      document.getElementById("st-orders").textContent   = d.orderCount30d ?? "—";
+      document.getElementById("st-revenue").textContent  = fmtMoney(d.revenue30d, d.currency);
+      document.getElementById("st-top").innerHTML = d.topProduct
+        ? `<b>${d.topProduct}</b>` +
+          (d.topPrice != null ? fmtMoney(parseFloat(d.topPrice), d.currency) : "") +
+          (d.totalInventory != null ? ` · ${d.totalInventory.toLocaleString()} in stock` : "")
+        : "";
+      flag.textContent = d.stale ? "CACHED" : "LIVE";
+      flag.className = "store-flag live";
+    } catch (e) {
+      flag.textContent = "OFFLINE";
+      flag.className = "store-flag err";
+    }
+  }
+  loadStoreStats();
+  setInterval(loadStoreStats, 60000); // refresh each minute; the backend caches 10 min
+
+  // ── Live task queue (polls /tasks every 3s, counts in-browser) ──
+  const TASKS_URL = "http://2.24.126.194:3001/tasks";
+  const ACTIVE_STATUSES = ["in_progress", "assigned", "running"];
+  function setAgentState(id, text, idle){
+    const b = document.querySelector('.room[data-id="'+id+'"] .badge');
+    if (b){ b.textContent = text; b.classList.toggle("idle", !!idle); }
+    const row = [...document.querySelectorAll('#roster .agent')]
+      .find(a => a.querySelector('.nm')?.textContent.trim().toLowerCase() === id);
+    if (row){ row.querySelector('.st').textContent = text; row.classList.toggle("idle", !!idle); }
+  }
+  async function loadTaskStats(){
+    try{
+      const r = await fetch(TASKS_URL, { cache:"no-store" });
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const tasks = await r.json();
+      const activeTasks = tasks.filter(t => ACTIVE_STATUSES.includes(t.status));
+      document.getElementById("s-tasks").textContent  = tasks.length;
+      document.getElementById("s-done").textContent   = tasks.filter(t => t.status === "done").length;
+      document.getElementById("s-active").textContent = activeTasks.length;
+      const activeAgents = new Set(activeTasks.map(t => (t.assignee||"").toLowerCase()));
+      ROOMS.filter(r => r.agent).forEach(r => {
+        const on = activeAgents.has(r.id);
+        setAgentState(r.id, on ? "ACTIVE" : "IDLE", !on);
+      });
+    }catch(e){ /* keep last-known values on error */ }
+  }
+  loadTaskStats();
+  setInterval(loadTaskStats, 3000);
+</script>
+</body>
+</html>

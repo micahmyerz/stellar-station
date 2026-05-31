@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task #<%= task.id %> - Stellar Station</title>
+    <link rel="stylesheet" href="/css/retro.css">
+</head>
+<body>
+    <div class="crt">
+        <header class="pixel-border">
+            <h1 class="glow">MISSION #<%= task.id %></h1>
+            <p class="subtitle"><a href="/" class="btn-link">← BACK TO MISSION CONTROL</a></p>
+        </header>
+
+        <section class="pixel-border">
+            <h2 class="section-title">📋 MISSION DETAILS</h2>
+            
+            <table class="pixel-table">
+                <tr>
+                    <th>ID</th>
+                    <td>#<%= task.id %></td>
+                </tr>
+                <tr>
+                    <th>AGENT</th>
+                    <td><%= task.assignee.toUpperCase() %></td>
+                </tr>
+                <tr>
+                    <th>TYPE</th>
+                    <td><%= task.type %></td>
+                </tr>
+                <tr>
+                    <th>STATUS</th>
+                    <td>
+                        <% if (task.status === 'done') { %>
+                            <span class="badge green">✓ DONE</span>
+                        <% } else if (task.status === 'failed') { %>
+                            <span class="badge red">✗ FAILED</span>
+                        <% } else if (task.status === 'in_progress') { %>
+                            <span class="badge yellow">● IN PROGRESS</span>
+                        <% } else { %>
+                            <span class="badge">○ PENDING</span>
+                        <% } %>
+                    </td>
+                </tr>
+                <tr>
+                    <th>CREATED BY</th>
+                    <td><%= task.created_by || 'SYSTEM' %></td>
+                </tr>
+                <tr>
+                    <th>CREATED AT</th>
+                    <td><%= new Date(task.created_at).toLocaleString() %></td>
+                </tr>
+                <% if (task.started_at) { %>
+                <tr>
+                    <th>STARTED AT</th>
+                    <td><%= new Date(task.started_at).toLocaleString() %></td>
+                </tr>
+                <% } %>
+                <% if (task.completed_at) { %>
+                <tr>
+                    <th>COMPLETED AT</th>
+                    <td><%= new Date(task.completed_at).toLocaleString() %></td>
+                </tr>
+                <% } %>
+                <tr>
+                    <th>PRIORITY</th>
+                    <td><%= task.priority %></td>
+                </tr>
+                <tr>
+                    <th>COST ESTIMATE</th>
+                    <td>$<%= task.cost_estimate %></td>
+                </tr>
+                <% if (task.cost_actual) { %>
+                <tr>
+                    <th>COST ACTUAL</th>
+                    <td>$<%= task.cost_actual %></td>
+                </tr>
+                <% } %>
+            </table>
+        </section>
+
+        <% if (task.payload) { %>
+        <section class="pixel-border green">
+            <h2 class="section-title">📦 PAYLOAD</h2>
+            <pre style="color: var(--green); font-size: 8px; overflow-x: auto;"><%= task.payload %></pre>
+        </section>
+        <% } %>
+
+        <% if (task.result) { %>
+        <section class="pixel-border <%= task.status === 'done' ? 'cyan' : 'red' %>">
+            <h2 class="section-title">📊 RESULT</h2>
+            <pre style="color: var(--<%= task.status === 'done' ? 'cyan' : 'red' %>); font-size: 8px; overflow-x: auto;"><%= task.result %></pre>
+        </section>
+        <% } %>
+
+        <% if (task.notes) { %>
+        <section class="pixel-border yellow">
+            <h2 class="section-title">📝 NOTES</h2>
+            <pre style="color: var(--yellow); font-size: 8px;"><%= task.notes %></pre>
+        </section>
+        <% } %>
+
+        <footer class="pixel-border">
+            <p><a href="/" class="btn-link">← RETURN TO MISSION CONTROL</a></p>
+        </footer>
+    </div>
+
+    <script src="/js/retro.js"></script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= name.toUpperCase() %> - Stellar Station</title>
+    <link rel="stylesheet" href="/css/retro.css">
+</head>
+<body>
+    <div class="crt">
+        <header class="pixel-border">
+            <h1 class="glow"><%= name.toUpperCase() %></h1>
+            <p class="subtitle"><a href="/" class="btn-link">← BACK TO MISSION CONTROL</a></p>
+        </header>
+
+        <section class="pixel-border cyan">
+            <h2 class="section-title">🛸 AGENT PROFILE</h2>
+            <pre style="color: var(--cyan); font-size: 8px; overflow-x: auto; white-space: pre-wrap;"><%= identity %></pre>
+        </section>
+
+        <section class="pixel-border">
+            <h2 class="section-title">📋 MISSION HISTORY</h2>
+            <% if (tasks.length === 0) { %>
+                <div class="no-data">No missions assigned yet.</div>
+            <% } else { %>
+                <table class="pixel-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>TYPE</th>
+                            <th>STATUS</th>
+                            <th>CREATED</th>
+                            <th>ACTION</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% tasks.forEach(task => { %>
+                            <tr>
+                                <td>#<%= task.id %></td>
+                                <td><%= task.type %></td>
+                                <td>
+                                    <% if (task.status === 'done') { %>
+                                        <span class="badge green">✓</span>
+                                    <% } else if (task.status === 'failed') { %>
+                                        <span class="badge red">✗</span>
+                                    <% } else if (task.status === 'in_progress') { %>
+                                        <span class="badge yellow">●</span>
+                                    <% } else { %>
+                                        <span class="badge">○</span>
+                                    <% } %>
+                                </td>
+                                <td><%= new Date(task.created_at).toLocaleString() %></td>
+                                <td><a href="/task/<%= task.id %>" class="btn-link">VIEW</a></td>
+                            </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            <% } %>
+        </section>
+
+        <footer class="pixel-border">
+            <p><a href="/" class="btn-link">← RETURN TO MISSION CONTROL</a></p>
+        </footer>
+    </div>
+
+    <script src="/js/retro.js"></script>
+</body>
+</html>

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⭐ Stellar Station - Mission Control (Animated)</title>
+    <link rel="stylesheet" href="/css/retro.css">
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #0f0f23;
+        }
+        
+        #game-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #stats-overlay {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(15, 15, 35, 0.9);
+            border: 3px solid #00ffcc;
+            box-shadow: 0 0 20px #00ffcc;
+            padding: 20px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            color: #00ffcc;
+            max-width: 400px;
+        }
+        
+        .stat-row {
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+        }
+        
+        .agent-status {
+            margin: 5px 0;
+            font-size: 8px;
+        }
+        
+        .status-active {
+            color: #00ff00;
+        }
+        
+        .status-idle {
+            color: #666699;
+        }
+        
+        #room-info {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: rgba(15, 15, 35, 0.9);
+            border: 3px solid #ff00ff;
+            box-shadow: 0 0 20px #ff00ff;
+            padding: 15px 30px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 12px;
+            color: #ff00ff;
+            text-align: center;
+            display: none;
+        }
+        
+        #controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(15, 15, 35, 0.9);
+            border: 3px solid #ffff00;
+            box-shadow: 0 0 20px #ffff00;
+            padding: 15px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            color: #ffff00;
+        }
+        
+        .btn {
+            display: block;
+            margin: 10px 0;
+            padding: 8px 16px;
+            background: #ffff00;
+            color: #0f0f23;
+            border: 2px solid #ffff00;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+        }
+        
+        .btn:hover {
+            background: transparent;
+            color: #ffff00;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    
+    <div id="stats-overlay">
+        <div style="text-align: center; margin-bottom: 15px;">
+            <strong>⭐ STELLAR STATION</strong>
+        </div>
+        <div class="stat-row">
+            <span>TASKS:</span>
+            <span id="task-total">0</span>
+        </div>
+        <div class="stat-row">
+            <span>COMPLETED:</span>
+            <span id="task-done" style="color: #00ff00;">0</span>
+        </div>
+        <div class="stat-row">
+            <span>ACTIVE:</span>
+            <span id="task-active" style="color: #ffff00;">0</span>
+        </div>
+        <hr style="border-color: #00ffcc; margin: 15px 0;">
+        <div style="margin-top: 10px;">
+            <div class="agent-status" id="status-atlas">🌍 ATLAS: <span class="status-idle">IDLE</span></div>
+            <div class="agent-status" id="status-vega">⭐ VEGA: <span class="status-idle">IDLE</span></div>
+            <div class="agent-status" id="status-nova">💫 NOVA: <span class="status-idle">IDLE</span></div>
+            <div class="agent-status" id="status-pulsar">📊 PULSAR: <span class="status-idle">IDLE</span></div>
+            <div class="agent-status" id="status-lyra">✨ LYRA: <span class="status-idle">IDLE</span></div>
+        </div>
+    </div>
+    
+    <div id="room-info"></div>
+    
+    <div id="controls">
+        <div style="margin-bottom: 15px;"><strong>CONTROLS</strong></div>
+        <a href="/dashboard-simple" class="btn">DATA VIEW</a>
+        <a href="/" class="btn">STATS ONLY</a>
+    </div>
+
+    <script src="/js/mission-control.js"></script>
+</body>
+</html>

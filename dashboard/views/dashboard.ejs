@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⭐ Stellar Station - Mission Control</title>
+    <link rel="stylesheet" href="/css/retro.css">
+</head>
+<body>
+    <div class="crt">
+        <!-- Header -->
+        <header class="pixel-border">
+            <h1 class="glow">⭐ STELLAR STATION</h1>
+            <p class="subtitle">MISSION CONTROL // AUTONOMOUS AGENT SYSTEM</p>
+            <div class="status-bar">
+                <span class="status-ok">● ONLINE</span>
+                <span class="status-text">VPS: 2.24.126.194</span>
+                <span class="status-text">STORE: getniella.com</span>
+            </div>
+        </header>
+
+        <!-- System Stats -->
+        <section class="stats-grid">
+            <div class="stat-card pixel-border">
+                <div class="stat-label">TOTAL TASKS</div>
+                <div class="stat-value glow"><%= stats.total %></div>
+            </div>
+            <div class="stat-card pixel-border green">
+                <div class="stat-label">COMPLETED</div>
+                <div class="stat-value glow"><%= stats.done %></div>
+            </div>
+            <div class="stat-card pixel-border yellow">
+                <div class="stat-label">IN PROGRESS</div>
+                <div class="stat-value glow"><%= stats.in_progress %></div>
+            </div>
+            <div class="stat-card pixel-border red">
+                <div class="stat-label">FAILED</div>
+                <div class="stat-value glow"><%= stats.failed %></div>
+            </div>
+        </section>
+
+        <!-- Agent Status -->
+        <section class="agent-bay">
+            <h2 class="section-title pixel-border">🛸 AGENT BAY</h2>
+            <div class="agents-grid">
+                <% 
+                const agentInfo = {
+                    atlas: { icon: '🌍', title: 'ATLAS', role: 'Manager', color: 'cyan' },
+                    vega: { icon: '⭐', title: 'VEGA', role: 'Research', color: 'blue' },
+                    nova: { icon: '💫', title: 'NOVA', role: 'Marketing', color: 'magenta' },
+                    pulsar: { icon: '📊', title: 'PULSAR', role: 'Analytics', color: 'green' },
+                    lyra: { icon: '✨', title: 'LYRA', role: 'Copywriting', color: 'yellow' }
+                };
+                
+                ['atlas', 'vega', 'nova', 'pulsar', 'lyra'].forEach(agent => {
+                    const stats = agents.find(a => a.assignee === agent) || { total: 0, completed: 0, failed: 0, active: 0 };
+                    const info = agentInfo[agent];
+                %>
+                    <div class="agent-card pixel-border <%= info.color %>">
+                        <div class="agent-icon"><%= info.icon %></div>
+                        <div class="agent-name"><%= info.title %></div>
+                        <div class="agent-role"><%= info.role %></div>
+                        <div class="agent-stats">
+                            <div>Tasks: <%= stats.total %></div>
+                            <div>✓ <%= stats.completed %> | ✗ <%= stats.failed %></div>
+                            <% if (stats.active > 0) { %>
+                                <div class="status-active">● ACTIVE</div>
+                            <% } else { %>
+                                <div class="status-idle">○ IDLE</div>
+                            <% } %>
+                        </div>
+                        <a href="/agent/<%= agent %>" class="btn-pixel">VIEW</a>
+                    </div>
+                <% }); %>
+            </div>
+        </section>
+
+        <!-- Recent Tasks -->
+        <section class="recent-tasks">
+            <h2 class="section-title pixel-border">📋 RECENT MISSIONS</h2>
+            <div class="task-list pixel-border">
+                <% if (recentTasks.length === 0) { %>
+                    <div class="no-data">No tasks yet. System ready.</div>
+                <% } else { %>
+                    <table class="pixel-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>AGENT</th>
+                                <th>TYPE</th>
+                                <th>STATUS</th>
+                                <th>CREATED</th>
+                                <th>ACTION</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% recentTasks.forEach(task => { %>
+                                <tr class="status-<%= task.status %>">
+                                    <td>#<%= task.id %></td>
+                                    <td><%= task.assignee.toUpperCase() %></td>
+                                    <td><%= task.type %></td>
+                                    <td>
+                                        <% if (task.status === 'done') { %>
+                                            <span class="badge green">✓ DONE</span>
+                                        <% } else if (task.status === 'failed') { %>
+                                            <span class="badge red">✗ FAILED</span>
+                                        <% } else if (task.status === 'in_progress') { %>
+                                            <span class="badge yellow">● ACTIVE</span>
+                                        <% } else { %>
+                                            <span class="badge">○ PENDING</span>
+                                        <% } %>
+                                    </td>
+                                    <td><%= new Date(task.created_at).toLocaleString() %></td>
+                                    <td><a href="/task/<%= task.id %>" class="btn-link">VIEW</a></td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                <% } %>
+            </div>
+        </section>
+
+        <!-- War Room Reports -->
+        <% if (reports.length > 0) { %>
+            <section class="war-room">
+                <h2 class="section-title pixel-border">📡 WAR ROOM INTEL</h2>
+                <div class="reports-list pixel-border">
+                    <% reports.forEach(report => { %>
+                        <div class="report-item">
+                            <span class="report-icon">📄</span>
+                            <a href="/report/<%= report.name %>" class="report-link"><%= report.name %></a>
+                            <span class="report-time"><%= report.time.toLocaleString() %></span>
+                        </div>
+                    <% }); %>
+                </div>
+            </section>
+        <% } %>
+
+        <!-- Footer -->
+        <footer class="pixel-border">
+            <p>Stellar Station v1.0 // VPS: Hostinger // Theme: Retro Pixel Space</p>
+            <p>getniella.com Autonomous Operations Center</p>
+        </footer>
+    </div>
+
+    <script src="/js/retro.js"></script>
+</body>
+</html>

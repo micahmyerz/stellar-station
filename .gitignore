@@ -1,0 +1,38 @@
+# Secrets and credentials
+.env
+.env.*
+*.key
+*.pem
+*secret*
+*token*
+oauth_state.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+*.egg-info/
+
+# Node
+node_modules/
+*.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Live store data and agent reports
+war-room/
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python virtual environments
+venv/
+.venv/
+env/
