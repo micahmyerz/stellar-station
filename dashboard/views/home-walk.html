@@ -173,12 +173,28 @@ class Station extends Phaser.Scene{
     mk('idle-down',ROWS.idleDown);mk('idle-side',ROWS.idleSide);mk('idle-up',ROWS.idleUp);
     mk('walk-down',ROWS.walkDown);mk('walk-side',ROWS.walkSide);mk('walk-up',ROWS.walkUp);
     ROOMS.forEach(r=>{
+      // fixed room-name label anchored at the room's center-top (always visible)
+      const roomLabel=this.add.text(r.x, r.y-110, r.name, {fontFamily:'monospace',
+        fontSize:'20px', color:r.css, fontStyle:'bold'})
+        .setOrigin(0.5).setStroke('#05070f',6).setShadow(0,0,r.css,8).setDepth(8);
+
+      // whole-room clickable zone (click anywhere in the room, not just the sprite)
+      const zone=this.add.rectangle(r.x, r.y, r.wander*2+80, 320, 0xffffff, 0)
+        .setInteractive({useHandCursor:true}).setDepth(7);
+      const ring=this.add.rectangle(r.x, r.y, r.wander*2+80, 320)
+        .setStrokeStyle(3, hex(r.css), 0).setDepth(7);
+      zone.on('pointerover',()=>ring.setStrokeStyle(3,hex(r.css),0.8));
+      zone.on('pointerout', ()=>ring.setStrokeStyle(3,hex(r.css),0));
+      zone.on('pointerdown',()=>openPanel(r.id));
+
+      if(!r.agent){ return; }  // War Room is a meeting space — no resident agent sprite
+
       const glow=this.add.ellipse(r.x,r.y+22,60,20,hex(r.css),0).setDepth(9);
       const shadow=this.add.ellipse(r.x,r.y+24,40,12,0x000000,0.45).setDepth(9);
       const spr=this.add.sprite(r.x,r.y,'player').setScale(SPRITE_SCALE).setDepth(10);
       spr.play('idle-down');
       const label=this.add.text(r.x,r.y-46,r.id.toUpperCase(),{fontFamily:'monospace',
-        fontSize:'15px',color:'#fff',fontStyle:'bold'}).setOrigin(0.5).setStroke('#05070f',5).setDepth(11);
+        fontSize:'13px',color:'#fff',fontStyle:'bold'}).setOrigin(0.5).setStroke('#05070f',5).setDepth(11);
       const ag={room:r,id:r.id,sprite:spr,label,glow,shadow,home:{x:r.x,y:r.y},facing:'down',moving:false,working:false,_t:0};
       this.agents.push(ag);
       spr.setInteractive({useHandCursor:true}); spr.on('pointerdown',()=>openPanel(r.id));
@@ -274,8 +290,8 @@ function fillPanel(id){
   document.getElementById('d-name').textContent=r.name;
   document.getElementById('d-role').textContent=r.role;
   const st=document.getElementById('d-status'),cur=document.getElementById('d-current'),rep=document.getElementById('d-report');
-  if(!r.agent){st.className='pill idle';st.textContent='STANDBY';
-    cur.textContent='War Room is a strategy view — it is not assigned tasks.';
+  if(!r.agent){st.className='pill idle';st.textContent='MEETING ROOM';
+    cur.textContent='The War Room is a shared meeting space — where agents convene to bring their data together. No single agent lives here.';
     rep.className='report empty';rep.textContent='—';return;}
   const s=STATE.perAgent[id]||{};
   if(s.working){st.className='pill work';st.textContent='WORKING';st.style.background=r.css;st.style.borderColor=r.css;}
