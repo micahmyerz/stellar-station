@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stellar Station — Command Interface</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
+<style>
+  :root{
+    --bg-0:#070611; --bg-1:#0d0a1f; --panel:#0c0a1aee; --panel-line:#2a2150;
+    --ink:#d7d2f5; --ink-dim:#8b86b8; --grid-gap:18px;
+    --atlas:#5bc8ff; --vega:#46e5a0; --nova:#ff5bd0; --pulsar:#7cff5b; --lyra:#ffb23e; --warroom:#ff4d6d;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;color:var(--ink);
+    background:radial-gradient(1200px 700px at 80% -10%, #2a1b5533 0,transparent 60%),
+      radial-gradient(900px 600px at -10% 110%, #15324d44 0,transparent 60%),
+      linear-gradient(160deg,var(--bg-1),var(--bg-0));background-attachment:fixed;overflow:hidden}
+  .wrap{position:relative;z-index:2;height:100vh;display:flex;flex-direction:column;
+    padding:14px clamp(12px,2vw,22px)}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px}
+  .brand .star{color:var(--lyra);font-size:20px;filter:drop-shadow(0 0 8px var(--lyra));animation:spin 6s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .brand h1{font-family:"Press Start 2P",monospace;font-size:clamp(12px,2vw,16px);letter-spacing:1px;
+    margin:0;color:#fff;text-shadow:0 0 14px #6f5bff88}
+  .conn{display:flex;align-items:center;gap:7px;font-size:10px;letter-spacing:1px;padding:7px 11px;
+    border-radius:999px;border:1px solid var(--panel-line);background:var(--panel)}
+  .conn .dot{width:8px;height:8px;border-radius:50%;background:#ff9d3c;box-shadow:0 0 8px #ff9d3c}
+  .conn.live .dot{background:#39e08a;box-shadow:0 0 10px #39e08a;animation:pulse 1.4s ease-in-out infinite}
+  .conn.live{color:#bfeedd;border-color:rgba(57,224,138,.4)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  .frame{display:grid;grid-template-columns:266px 1fr;gap:var(--grid-gap);align-items:stretch;flex:1;min-height:0}
+  .panel{background:var(--panel);border:1px solid var(--panel-line);border-radius:12px;
+    box-shadow:0 0 0 1px #ffffff08 inset,0 18px 40px #00000066;backdrop-filter:blur(3px)}
+  .console{padding:16px;overflow-y:auto}
+  .console h2{font-size:11px;letter-spacing:2px;color:var(--ink-dim);margin:0 0 12px;
+    border-bottom:1px dashed var(--panel-line);padding-bottom:10px}
+  .stat{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0}
+  .stat .k{color:var(--ink-dim);font-size:12px;letter-spacing:1px}
+  .stat .v{font-size:20px;font-weight:700;color:#fff}
+  .stat .v.active{color:var(--pulsar);text-shadow:0 0 10px var(--pulsar)}
+  .roster{margin-top:14px;border-top:1px dashed var(--panel-line);padding-top:12px}
+  .agent{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:12px;letter-spacing:.5px}
+  .agent .nm{color:var(--ink);flex:1}
+  .agent .st{color:var(--ink-dim);font-size:10px;letter-spacing:1px}
+  .led{width:9px;height:9px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c);flex:none}
+  .agent.idle .led{animation:pulse 2.6s ease-in-out infinite}
+  .store{border-top:1px dashed var(--panel-line);padding-top:12px;margin-top:14px}
+  .store h2{border:0;padding:0;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+  .store-flag{font-size:9px;letter-spacing:1px;padding:2px 7px;border-radius:999px;background:#2b2450;color:var(--ink-dim)}
+  .store-flag.live{background:var(--pulsar);color:#06120a;box-shadow:0 0 10px -2px var(--pulsar)}
+  .store-flag.err{background:var(--warroom);color:#1a0410}
+  .store-top{margin-top:10px;font-size:11px;color:var(--ink-dim);line-height:1.5}
+  .store-top b{color:#fff;font-weight:600;display:block}
+
+  /* ship stage */
+  .stage{position:relative;border-radius:12px;overflow:hidden;background:#070912;
+    box-shadow:0 0 0 1px var(--panel-line),0 14px 30px #00000055}
+  #game{position:absolute;inset:0}
+  #hint{position:absolute;bottom:8px;left:0;right:0;text-align:center;color:var(--ink-dim);
+    font-size:10px;letter-spacing:.5px;pointer-events:none;z-index:5}
+
+  /* detail panel */
+  #ov{position:fixed;inset:0;background:rgba(3,5,12,.55);backdrop-filter:blur(3px);z-index:30;opacity:0;pointer-events:none;transition:opacity .2s}
+  #ov.show{opacity:1;pointer-events:auto}
+  #dpanel{position:fixed;top:0;right:0;height:100%;width:min(420px,92vw);z-index:40;
+    background:linear-gradient(180deg,#0c1022,#080a14);border-left:1px solid var(--panel-line);
+    transform:translateX(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);padding:24px 22px;overflow-y:auto}
+  #dpanel.show{transform:translateX(0)}
+  #dpanel .x{position:absolute;top:14px;right:16px;cursor:pointer;color:var(--ink-dim);font-size:20px;background:none;border:none}
+  #dpanel h2{font-family:"Press Start 2P",monospace;font-size:13px;margin:4px 0 2px;color:var(--accent,#fff)}
+  #dpanel .drole{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--ink-dim);margin-bottom:18px}
+  #dpanel .field{margin-bottom:15px}
+  #dpanel .fk{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink-dim);margin-bottom:6px}
+  .pill{display:inline-block;font-size:10px;letter-spacing:1px;padding:5px 10px;border-radius:6px;border:1px solid var(--panel-line)}
+  .pill.work{color:#06210f;font-weight:700}
+  .pill.idle{color:var(--ink-dim)}
+  .report{background:#0a0e1c;border:1px solid var(--panel-line);border-radius:10px;padding:13px;
+    font-size:12px;line-height:1.6;white-space:pre-wrap;color:#cfd6ee;max-height:300px;overflow:auto}
+  .report.empty{color:var(--ink-dim);font-style:italic}
+
+  @media (max-width:880px){
+    body{overflow:auto}
+    .wrap{height:auto}
+    .frame{grid-template-columns:1fr}
+    .stage{height:60vh}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <div class="brand"><span class="star">★</span><h1>STELLAR STATION</h1></div>
+    <div class="conn" id="conn"><span class="dot"></span><span id="conn-text">CONNECTING…</span></div>
+  </header>
+
+  <div class="frame">
+    <aside class="panel console">
+      <h2>◇ STATION STATUS</h2>
+      <div class="stat"><span class="k">TASKS</span><span class="v" id="s-tasks">—</span></div>
+      <div class="stat"><span class="k">COMPLETED</span><span class="v" id="s-done">—</span></div>
+      <div class="stat"><span class="k">ACTIVE</span><span class="v active" id="s-active">—</span></div>
+      <div class="roster" id="roster"></div>
+      <div class="store">
+        <h2>◇ LIVE STORE <span class="store-flag" id="store-flag">…</span></h2>
+        <div class="stat"><span class="k">PRODUCTS</span><span class="v" id="st-products">—</span></div>
+        <div class="stat"><span class="k">ORDERS 30D</span><span class="v" id="st-orders">—</span></div>
+        <div class="stat"><span class="k">REVENUE 30D</span><span class="v" id="st-revenue">—</span></div>
+        <div class="store-top" id="st-top"></div>
+      </div>
+    </aside>
+
+    <div class="stage panel">
+      <div id="game"></div>
+      <div id="hint">Click an agent to see what it is doing and what it last produced.</div>
+    </div>
+  </div>
+</div>
+
+<div id="ov"></div>
+<aside id="dpanel">
+  <button class="x" id="closeX">✕</button>
+  <h2 id="d-name">—</h2>
+  <div class="drole" id="d-role">—</div>
+  <div class="field"><div class="fk">Status</div><div><span class="pill idle" id="d-status">—</span></div></div>
+  <div class="field"><div class="fk">Current task</div><div id="d-current">—</div></div>
+  <div class="field"><div class="fk">Last result produced</div><div class="report empty" id="d-report">No completed tasks yet.</div></div>
+</aside>
+
+<script>
+const HERO_W=2560, HERO_H=1428;
+const HERO_URL="/rooms/hero-bg-v3.png";
+const PLAYER_URL="/Player.png";
+const TASKS_URL="/api/tasks";                                  // same-origin (:3000)
+const STORE_URL="http://2.24.126.194:3001/store-stats";        // API server (:3001, CORS open)
+const POLL_MS=3000, STORE_MS=60000;
+const ACTIVE_STATUSES=["in_progress","assigned","running"];
+const ROWS={idleDown:0,idleSide:6,idleUp:12,walkDown:18,walkSide:24,walkUp:30};
+const SPRITE_SCALE=2.6, SPEED=90;
+
+const ROOMS=[
+  {id:"vega",   name:"VEGA RESEARCH",   role:"Research",    css:"#46e5a0", agent:true,  x:624,  y:377,  wander:150},
+  {id:"lyra",   name:"LYRA COPY",       role:"Copywriting", css:"#ffb23e", agent:true,  x:1338, y:405,  wander:150},
+  {id:"atlas",  name:"ATLAS COMMAND",   role:"Manager",     css:"#5bc8ff", agent:true,  x:2066, y:380,  wander:150},
+  {id:"nova",   name:"NOVA MARKETING",  role:"Marketing",   css:"#ff5bd0", agent:true,  x:612,  y:1068, wander:150},
+  {id:"warroom",name:"WAR ROOM",        role:"Strategy",    css:"#ff4d6d", agent:false, x:1336, y:1044, wander:150},
+  {id:"pulsar", name:"PULSAR ANALYTICS",role:"Analytics",   css:"#7cff5b", agent:true,  x:2077, y:1051, wander:150},
+];
+const ROOM_BY_ID=Object.fromEntries(ROOMS.map(r=>[r.id,r]));
+const hex=c=>parseInt(c.replace('#',''),16);
+const STATE={live:false,workingSet:new Set(),perAgent:{}};
+
+// roster
+document.getElementById('roster').innerHTML = ROOMS.filter(r=>r.agent).map(r=>`
+  <div class="agent idle" data-id="${r.id}" style="--c:${r.css}">
+    <span class="led"></span><span class="nm">${r.name.split(' ')[0]}</span><span class="st">IDLE</span>
+  </div>`).join('');
+
+class Station extends Phaser.Scene{
+  constructor(){super('station');this.agents=[];}
+  preload(){this.load.image('hero',HERO_URL);
+    this.load.spritesheet('player',PLAYER_URL,{frameWidth:32,frameHeight:32});}
+  create(){
+    this.add.image(0,0,'hero').setOrigin(0,0).setDisplaySize(HERO_W,HERO_H);
+    const mk=(k,s)=>this.anims.create({key:k,frameRate:8,repeat:-1,
+      frames:this.anims.generateFrameNumbers('player',{start:s,end:s+5})});
+    mk('idle-down',ROWS.idleDown);mk('idle-side',ROWS.idleSide);mk('idle-up',ROWS.idleUp);
+    mk('walk-down',ROWS.walkDown);mk('walk-side',ROWS.walkSide);mk('walk-up',ROWS.walkUp);
+    ROOMS.forEach(r=>{
+      const glow=this.add.ellipse(r.x,r.y+22,60,20,hex(r.css),0).setDepth(9);
+      const shadow=this.add.ellipse(r.x,r.y+24,40,12,0x000000,0.45).setDepth(9);
+      const spr=this.add.sprite(r.x,r.y,'player').setScale(SPRITE_SCALE).setDepth(10);
+      spr.play('idle-down');
+      const label=this.add.text(r.x,r.y-46,r.id.toUpperCase(),{fontFamily:'monospace',
+        fontSize:'15px',color:'#fff',fontStyle:'bold'}).setOrigin(0.5).setStroke('#05070f',5).setDepth(11);
+      const ag={room:r,id:r.id,sprite:spr,label,glow,shadow,home:{x:r.x,y:r.y},facing:'down',moving:false,working:false,_t:0};
+      this.agents.push(ag);
+      spr.setInteractive({useHandCursor:true}); spr.on('pointerdown',()=>openPanel(r.id));
+    });
+    this.time.addEvent({delay:1400,loop:true,callback:()=>this.brain()});
+  }
+  brain(){this.agents.filter(a=>a.room.agent).forEach(ag=>{
+    ag.working=STATE.workingSet.has(ag.id); if(ag.moving)return;
+    const h=ag.home,w=ag.room.wander;
+    if(ag.working){if(Phaser.Math.Distance.Between(ag.sprite.x,ag.sprite.y,h.x,h.y)>16)this.moveTo(ag,h.x,h.y);}
+    else if(Math.random()<0.55){this.moveTo(ag,h.x+Phaser.Math.Between(-w,w),h.y+Phaser.Math.Between(-w*0.55,w*0.55));}
+  });}
+  moveTo(ag,tx,ty){const dx=tx-ag.sprite.x,dy=ty-ag.sprite.y,dist=Math.hypot(dx,dy);if(dist<4)return;
+    ag.moving=true;
+    if(Math.abs(dx)>Math.abs(dy)){ag.sprite.play('walk-side',true);ag.sprite.setFlipX(dx<0);ag.facing=dx<0?'left':'right';}
+    else{ag.sprite.play(dy<0?'walk-up':'walk-down',true);ag.facing=dy<0?'up':'down';}
+    this.tweens.add({targets:ag.sprite,x:tx,y:ty,duration:(dist/SPEED)*1000,ease:'Linear',
+      onComplete:()=>{ag.moving=false;this.idle(ag);}});}
+  idle(ag){if(ag.facing==='up')ag.sprite.play('idle-up',true);
+    else if(ag.facing==='down')ag.sprite.play('idle-down',true);
+    else{ag.sprite.play('idle-side',true);ag.sprite.setFlipX(ag.facing==='left');}}
+  update(t,dt){this.agents.forEach(ag=>{
+    ag.label.setPosition(ag.sprite.x,ag.sprite.y-46);
+    ag.glow.setPosition(ag.sprite.x,ag.sprite.y+22);
+    ag.shadow.setPosition(ag.sprite.x,ag.sprite.y+24);
+    if(ag.working){ag._t+=dt/1000;const a=0.45+0.35*Math.sin(ag._t*4);
+      ag.glow.setFillStyle(hex(ag.room.css),a);ag.glow.setScale(1+0.15*Math.sin(ag._t*4));ag.label.setColor(ag.room.css);}
+    else{ag.glow.setFillStyle(hex(ag.room.css),0);ag.glow.setScale(1);ag.label.setColor('#fff');}
+  });}
+}
+
+new Phaser.Game({type:Phaser.AUTO,parent:'game',backgroundColor:'#070912',pixelArt:true,
+  scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH,width:HERO_W,height:HERO_H},scene:Station});
+
+function setBadge(live){const c=document.getElementById('conn');
+  c.className='conn '+(live?'live':'');
+  document.getElementById('conn-text').textContent=live?'LIVE':'OFFLINE — no data';}
+function setRoster(id,text,idle){
+  const row=document.querySelector('#roster .agent[data-id="'+id+'"]');
+  if(row){row.querySelector('.st').textContent=text;row.classList.toggle('idle',!!idle);}
+}
+async function poll(){
+  try{
+    const res=await fetch(TASKS_URL,{cache:'no-store'}); if(!res.ok)throw 0;
+    const arr=await res.json(); const tasks=Array.isArray(arr)?arr:[];
+    document.getElementById('s-tasks').textContent=tasks.length;
+    document.getElementById('s-done').textContent=tasks.filter(t=>t.status==='done').length;
+    const act=tasks.filter(t=>ACTIVE_STATUSES.includes(t.status));
+    document.getElementById('s-active').textContent=act.length;
+    STATE.workingSet=new Set(act.map(t=>(t.assignee||'').toLowerCase()));
+    STATE.perAgent={};
+    ROOMS.filter(r=>r.agent).forEach(r=>{
+      const mine=tasks.filter(t=>(t.assignee||'').toLowerCase()===r.id);
+      const cur=mine.find(t=>ACTIVE_STATUSES.includes(t.status));
+      const done=mine.filter(t=>t.status==='done').sort((a,b)=>String(b.completed_at||'').localeCompare(String(a.completed_at||'')))[0];
+      let s=''; if(done&&done.result){try{const p=JSON.parse(done.result);s=p.summary||p.output||JSON.stringify(p,null,2);}catch(e){s=String(done.result);}}
+      const on=STATE.workingSet.has(r.id);
+      STATE.perAgent[r.id]={working:on,current:cur?('#'+cur.id+' · '+cur.type):null,last:s};
+      setRoster(r.id,on?'ACTIVE':'IDLE',!on);
+    });
+    STATE.live=true; setBadge(true); if(openId)fillPanel(openId);
+  }catch(e){ STATE.live=false; setBadge(false); }
+}
+poll(); setInterval(poll,POLL_MS);
+
+function fmtMoney(n,cur){ if(n==null)return '—';
+  try{return new Intl.NumberFormat(undefined,{style:'currency',currency:cur||'USD'}).format(n);}catch{return (cur||'$')+' '+n;} }
+async function loadStore(){
+  const flag=document.getElementById('store-flag');
+  try{
+    const r=await fetch(STORE_URL,{cache:'no-store'}); if(!r.ok)throw 0;
+    const d=await r.json();
+    document.getElementById('st-products').textContent=d.productCount??'—';
+    document.getElementById('st-orders').textContent=d.orderCount30d??'—';
+    document.getElementById('st-revenue').textContent=fmtMoney(d.revenue30d,d.currency);
+    document.getElementById('st-top').innerHTML=d.topProduct
+      ? `<b>${d.topProduct}</b>`+(d.topPrice!=null?fmtMoney(parseFloat(d.topPrice),d.currency):'')+(d.totalInventory!=null?` · ${d.totalInventory.toLocaleString()} in stock`:'')
+      : '';
+    flag.textContent=d.stale?'CACHED':'LIVE'; flag.className='store-flag live';
+  }catch(e){ flag.textContent='OFFLINE'; flag.className='store-flag err'; }
+}
+loadStore(); setInterval(loadStore,STORE_MS);
+
+let openId=null;
+const ov=document.getElementById('ov'),dpanel=document.getElementById('dpanel');
+function openPanel(id){openId=id;ov.classList.add('show');dpanel.classList.add('show');fillPanel(id);}
+function closePanel(){openId=null;ov.classList.remove('show');dpanel.classList.remove('show');}
+ov.addEventListener('click',closePanel);
+document.getElementById('closeX').addEventListener('click',closePanel);
+function fillPanel(id){
+  const r=ROOM_BY_ID[id]; if(!r)return;
+  dpanel.style.setProperty('--accent',r.css);
+  document.getElementById('d-name').textContent=r.name;
+  document.getElementById('d-role').textContent=r.role;
+  const st=document.getElementById('d-status'),cur=document.getElementById('d-current'),rep=document.getElementById('d-report');
+  if(!r.agent){st.className='pill idle';st.textContent='STANDBY';
+    cur.textContent='War Room is a strategy view — it is not assigned tasks.';
+    rep.className='report empty';rep.textContent='—';return;}
+  const s=STATE.perAgent[id]||{};
+  if(s.working){st.className='pill work';st.textContent='WORKING';st.style.background=r.css;st.style.borderColor=r.css;}
+  else{st.className='pill idle';st.textContent='IDLE';st.style.background='transparent';}
+  cur.textContent=s.working?(s.current||'Working…'):'Nothing running right now.';
+  if(s.last){rep.className='report';rep.textContent=s.last;}
+  else{rep.className='report empty';rep.textContent='No completed tasks yet.';}
+}
+</script>
+</body>
+</html>

@@ -20,8 +20,13 @@ const db = new Database(DB_PATH, { readonly: true });
 
 // Routes
 
-// Home - Mission Control Dashboard
+// Home - Walkable Ship with Sidebar
 app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views', 'home-walk.html'));
+});
+
+// Classic - Original Card Dashboard
+app.get('/classic', (req, res) => {
     res.render('stellar-station');
 });
 
