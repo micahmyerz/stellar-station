@@ -109,12 +109,12 @@ const ROWS={idleDown:0,idleSide:6,idleUp:12,walkDown:18,walkSide:24,walkUp:30};
 const SPRITE_SCALE=2.6, SPEED=90;
 
 const ROOMS=[
-  {id:"vega",   name:"VEGA RESEARCH",   role:"Research",    css:"#46e5a0", agent:true,  x:560,  y:380,  wander:170},
-  {id:"lyra",   name:"LYRA COPY",       role:"Copywriting", css:"#ffb23e", agent:true,  x:1280, y:380,  wander:170},
-  {id:"atlas",  name:"ATLAS COMMAND",   role:"Manager",     css:"#5bc8ff", agent:true,  x:1980, y:380,  wander:170},
-  {id:"nova",   name:"NOVA MARKETING",  role:"Marketing",   css:"#ff5bd0", agent:true,  x:560,  y:980,  wander:170},
-  {id:"warroom",name:"WAR ROOM",        role:"Strategy",    css:"#ff4d6d", agent:false, x:1280, y:980,  wander:170},
-  {id:"pulsar", name:"PULSAR ANALYTICS",role:"Analytics",   css:"#7cff5b", agent:true,  x:1980, y:980,  wander:170},
+  {id:"vega",   name:"VEGA RESEARCH",   role:"Research",    css:"#46e5a0", agent:true,  x:624,  y:377,  wander:150},
+  {id:"lyra",   name:"LYRA COPY",       role:"Copywriting", css:"#ffb23e", agent:true,  x:1338, y:405,  wander:150},
+  {id:"atlas",  name:"ATLAS COMMAND",   role:"Manager",     css:"#5bc8ff", agent:true,  x:2066, y:380,  wander:150},
+  {id:"nova",   name:"NOVA MARKETING",  role:"Marketing",   css:"#ff5bd0", agent:true,  x:612,  y:1068, wander:150},
+  {id:"warroom",name:"WAR ROOM",        role:"Strategy",    css:"#ff4d6d", agent:false, x:1336, y:1044, wander:150},
+  {id:"pulsar", name:"PULSAR ANALYTICS",role:"Analytics",   css:"#7cff5b", agent:true,  x:2077, y:1051, wander:150},
 ];
 const ROOM_BY_ID=Object.fromEntries(ROOMS.map(r=>[r.id,r]));
 const hex=c=>parseInt(c.replace('#',''),16);
