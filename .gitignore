@@ -36,3 +36,8 @@ Thumbs.db
 venv/
 .venv/
 env/
+
+# Paid third-party sprites (Kenmi "Cute Fantasy" - license forbids redistribution)
+dashboard/public/Player.png
+dashboard/public/Player_Actions.png
+*Cute*Fantasy*

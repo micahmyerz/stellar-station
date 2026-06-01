@@ -25,6 +25,11 @@ app.get('/', (req, res) => {
     res.render('stellar-station');
 });
 
+// Walkable Phaser station
+app.get('/walk', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views', 'walk.html'));
+});
+
 // API endpoint for live dashboard data
 app.get('/api/status', (req, res) => {
     const tasks = db.prepare('SELECT status FROM tasks').all();

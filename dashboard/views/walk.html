@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stellar Station — Live Crew</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
+<style>
+  :root{ --ink:#e8ecf8; --dim:#8a93b2; --line:rgba(255,255,255,.10); --panel:#0c1022; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#070912;color:var(--ink);
+    font-family:"Space Mono",ui-monospace,monospace;overflow:hidden}
+  #game{position:fixed;inset:0}
+  /* HUD */
+  #hud{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;
+    justify-content:space-between;gap:12px;padding:14px 18px;pointer-events:none}
+  .title{font-family:"Press Start 2P",monospace;font-size:15px;letter-spacing:1px;
+    text-shadow:0 0 14px rgba(120,180,255,.5);display:flex;gap:10px;align-items:center}
+  .title .star{color:#ffd34d;animation:spin 6s linear infinite;display:inline-block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .hudright{display:flex;gap:8px;align-items:center}
+  .stat{background:rgba(14,17,32,.82);border:1px solid var(--line);border-radius:9px;
+    padding:6px 11px;min-width:62px;text-align:center;backdrop-filter:blur(4px)}
+  .stat .k{font-size:8px;letter-spacing:1.5px;color:var(--dim);text-transform:uppercase}
+  .stat .v{font-family:"Press Start 2P",monospace;font-size:13px;margin-top:5px}
+  .stat.active .v{color:#7cff5b;text-shadow:0 0 9px rgba(124,255,91,.6)}
+  .conn{display:flex;align-items:center;gap:7px;font-size:10px;letter-spacing:1px;
+    padding:7px 11px;border-radius:999px;border:1px solid var(--line);
+    background:rgba(14,17,32,.82);backdrop-filter:blur(4px)}
+  .conn .dot{width:8px;height:8px;border-radius:50%;background:#ff9d3c;box-shadow:0 0 8px #ff9d3c}
+  .conn.live .dot{background:#39e08a;box-shadow:0 0 10px #39e08a;animation:pulse 1.4s ease-in-out infinite}
+  .conn.live{color:#bfeedd;border-color:rgba(57,224,138,.4)}
+  .conn.demo{color:#ffcf9a;border-color:rgba(255,157,60,.4)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  #hint{position:fixed;bottom:10px;left:0;right:0;z-index:20;text-align:center;
+    color:var(--dim);font-size:10px;letter-spacing:.5px;pointer-events:none}
+  /* detail panel */
+  #ov{position:fixed;inset:0;background:rgba(3,5,12,.55);backdrop-filter:blur(3px);z-index:30;
+    opacity:0;pointer-events:none;transition:opacity .2s}
+  #ov.show{opacity:1;pointer-events:auto}
+  #panel{position:fixed;top:0;right:0;height:100%;width:min(420px,92vw);z-index:40;
+    background:linear-gradient(180deg,#0c1022,#080a14);border-left:1px solid var(--line);
+    transform:translateX(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);
+    padding:24px 22px;overflow-y:auto}
+  #panel.show{transform:translateX(0)}
+  #panel .x{position:absolute;top:14px;right:16px;cursor:pointer;color:var(--dim);
+    font-size:20px;background:none;border:none}
+  #panel h2{font-family:"Press Start 2P",monospace;font-size:13px;margin:4px 0 2px;color:var(--accent,#fff)}
+  #panel .drole{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:18px}
+  #panel .field{margin-bottom:15px}
+  #panel .fk{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+  #panel .fv{font-size:13px;line-height:1.5}
+  .pill{display:inline-block;font-size:10px;letter-spacing:1px;padding:5px 10px;border-radius:6px;border:1px solid var(--line)}
+  .pill.work{color:#06210f;font-weight:700}
+  .pill.idle{color:var(--dim)}
+  .report{background:#0a0e1c;border:1px solid var(--line);border-radius:10px;padding:13px;
+    font-size:12px;line-height:1.6;white-space:pre-wrap;color:#cfd6ee;max-height:320px;overflow:auto}
+  .report.empty{color:var(--dim);font-style:italic}
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="title"><span class="star">★</span> STELLAR STATION</div>
+  <div class="hudright">
+    <div class="stat"><div class="k">Tasks</div><div class="v" id="s-tasks">—</div></div>
+    <div class="stat"><div class="k">Done</div><div class="v" id="s-done">—</div></div>
+    <div class="stat active"><div class="k">Active</div><div class="v" id="s-active">—</div></div>
+    <div class="conn demo" id="conn"><span class="dot"></span><span id="conn-text">CONNECTING…</span></div>
+  </div>
+</div>
+<div id="game"></div>
+<div id="hint">Click any room to see what that agent is doing and what it last produced.</div>
+
+<div id="ov"></div>
+<aside id="panel">
+  <button class="x" id="closeX">✕</button>
+  <h2 id="d-name">—</h2>
+  <div class="drole" id="d-role">—</div>
+  <div class="field"><div class="fk">Status</div><div class="fv"><span class="pill idle" id="d-status">—</span></div></div>
+  <div class="field"><div class="fk">Current task</div><div class="fv" id="d-current">—</div></div>
+  <div class="field"><div class="fk">Last result produced</div><div class="report empty" id="d-report">No completed tasks yet.</div></div>
+</aside>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+//  CONFIG
+// ─────────────────────────────────────────────────────────────────────────────
+const HERO_W = 1672, HERO_H = 941;
+const HERO_URL   = "/rooms/hero-bg.png";    // served by the dashboard (public/rooms)
+const PLAYER_URL = "/Player.png";           // Cute Fantasy sprite — gitignored, scp'd to public/
+const API        = "/api/tasks";            // same-origin: full task rows
+const POLL_MS    = 3000;
+const SPEED      = 70;                       // px/sec walk speed (native coords)
+const SPRITE_SCALE = 1.7;
+const ACTIVE_STATUSES = ["in_progress","assigned","running"];
+
+// frame rows on Player.png (6 cols each): 0 idleDn 1 idleSide 2 idleUp 3 walkDn 4 walkSide 5 walkUp
+const ROWS = { idleDown:0, idleSide:6, idleUp:12, walkDown:18, walkSide:24, walkUp:30 };
+
+// rooms with native-coord walkable floor rects (read off the hero), agent mapping + accent
+const ROOMS = [
+  {id:"vega",   name:"VEGA RESEARCH",   role:"Research",    css:"#46e5a0", agent:true,  floor:{x1:250,y1:240,x2:495,y2:370}},
+  {id:"lyra",   name:"LYRA COPY",       role:"Copywriting", css:"#ffb23e", agent:true,  floor:{x1:575,y1:240,x2:810,y2:370}},
+  {id:"atlas",  name:"ATLAS COMMAND",   role:"Manager",     css:"#5bc8ff", agent:true,  floor:{x1:900,y1:240,x2:1170,y2:370}},
+  {id:"nova",   name:"NOVA MARKETING",  role:"Marketing",   css:"#ff5bd0", agent:true,  floor:{x1:250,y1:480,x2:495,y2:665}},
+  {id:"warroom",name:"WAR ROOM",        role:"Strategy",    css:"#ff4d6d", agent:false, floor:{x1:575,y1:480,x2:810,y2:665}},
+  {id:"pulsar", name:"PULSAR ANALYTICS",role:"Analytics",   css:"#7cff5b", agent:true,  floor:{x1:900,y1:480,x2:1170,y2:665}},
+];
+const ROOM_BY_ID = Object.fromEntries(ROOMS.map(r=>[r.id,r]));
+function hex(css){ return parseInt(css.replace('#',''),16); }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SHARED LIVE STATE (written by the poller, read by Phaser)
+// ─────────────────────────────────────────────────────────────────────────────
+const STATE = { live:false, workingSet:new Set(), perAgent:{} };
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  PHASER SCENE
+// ─────────────────────────────────────────────────────────────────────────────
+class Station extends Phaser.Scene {
+  constructor(){ super('station'); this.agents=[]; }
+  preload(){
+    this.load.image('hero', HERO_URL);
+    this.load.spritesheet('player', PLAYER_URL, { frameWidth:32, frameHeight:32 });
+  }
+  create(){
+    this.add.image(0,0,'hero').setOrigin(0,0).setDisplaySize(HERO_W, HERO_H);
+
+    const mk = (key, start)=> this.anims.create({
+      key, frameRate:8, repeat:-1,
+      frames:this.anims.generateFrameNumbers('player',{ start, end:start+5 })
+    });
+    mk('idle-down',ROWS.idleDown); mk('idle-side',ROWS.idleSide); mk('idle-up',ROWS.idleUp);
+    mk('walk-down',ROWS.walkDown); mk('walk-side',ROWS.walkSide); mk('walk-up',ROWS.walkUp);
+
+    // room name labels + clickable zones
+    ROOMS.forEach(r=>{
+      const f=r.floor;
+      this.add.text(f.x1+4, f.y1-22, r.name, {
+        fontFamily:'monospace', fontSize:'13px', color:r.css, fontStyle:'bold'
+      }).setStroke('#05070f', 4).setShadow(0,0,r.css,6).setDepth(50);
+      const zone=this.add.rectangle((f.x1+f.x2)/2,(f.y1+f.y2)/2, f.x2-f.x1, f.y2-f.y1, 0xffffff, 0)
+        .setInteractive({useHandCursor:true});
+      zone.on('pointerover', ()=> this.hoverRing(r,true));
+      zone.on('pointerout',  ()=> this.hoverRing(r,false));
+      zone.on('pointerdown', ()=> openPanel(r.id));
+      r._hover=this.add.rectangle((f.x1+f.x2)/2,(f.y1+f.y2)/2, f.x2-f.x1, f.y2-f.y1)
+        .setStrokeStyle(2, hex(r.css), 0).setDepth(49);
+    });
+
+    // spawn agent sprites
+    ROOMS.filter(r=>r.agent).forEach(r=>{
+      const f=r.floor, cx=(f.x1+f.x2)/2, cy=(f.y1+f.y2)/2;
+      const glow=this.add.ellipse(cx,cy+12, 40,14, hex(r.css), 0.0).setDepth(9);
+      const shadow=this.add.ellipse(cx,cy+13, 26,8, 0x000000, 0.45).setDepth(9);
+      const spr=this.add.sprite(cx,cy,'player').setScale(SPRITE_SCALE).setDepth(10);
+      spr.play('idle-down');
+      const label=this.add.text(cx, cy-30, r.id.toUpperCase(), {
+        fontFamily:'monospace', fontSize:'11px', color:'#fff', fontStyle:'bold'
+      }).setOrigin(0.5).setStroke('#05070f',4).setDepth(11);
+      this.agents.push({ id:r.id, room:r, sprite:spr, label, glow, shadow,
+        facing:'down', moving:false, working:false, _t:0 });
+    });
+
+    // wander/work brain
+    this.time.addEvent({ delay:1300, loop:true, callback:()=>this.brain() });
+  }
+
+  hoverRing(r,on){ if(r._hover) r._hover.setStrokeStyle(2, hex(r.css), on?0.9:0); }
+
+  brain(){
+    this.agents.forEach(ag=>{
+      ag.working = STATE.workingSet.has(ag.id);
+      if(ag.moving) return;
+      const f=ag.room.floor;
+      if(ag.working){
+        // gravitate to the room's desk (center-ish) while working
+        const cx=(f.x1+f.x2)/2, cy=(f.y1+f.y2)/2;
+        if(Phaser.Math.Distance.Between(ag.sprite.x,ag.sprite.y,cx,cy)>14) this.moveTo(ag,cx,cy);
+      } else if(Math.random()<0.55){
+        this.moveTo(ag, Phaser.Math.Between(f.x1+12,f.x2-12), Phaser.Math.Between(f.y1+12,f.y2-12));
+      }
+    });
+  }
+
+  moveTo(ag,tx,ty){
+    const dx=tx-ag.sprite.x, dy=ty-ag.sprite.y, dist=Math.hypot(dx,dy);
+    if(dist<4) return;
+    ag.moving=true;
+    if(Math.abs(dx)>Math.abs(dy)){ ag.sprite.play('walk-side',true); ag.sprite.setFlipX(dx<0); ag.facing=dx<0?'left':'right'; }
+    else { ag.sprite.play(dy<0?'walk-up':'walk-down',true); ag.facing=dy<0?'up':'down'; }
+    this.tweens.add({ targets:ag.sprite, x:tx, y:ty, duration:(dist/SPEED)*1000, ease:'Linear',
+      onComplete:()=>{ ag.moving=false; this.idle(ag); } });
+  }
+  idle(ag){
+    if(ag.facing==='up') ag.sprite.play('idle-up',true);
+    else if(ag.facing==='down') ag.sprite.play('idle-down',true);
+    else { ag.sprite.play('idle-side',true); ag.sprite.setFlipX(ag.facing==='left'); }
+  }
+
+  update(time, delta){
+    this.agents.forEach(ag=>{
+      ag.label.setPosition(ag.sprite.x, ag.sprite.y-30);
+      ag.glow.setPosition(ag.sprite.x, ag.sprite.y+12);
+      ag.shadow.setPosition(ag.sprite.x, ag.sprite.y+13);
+      if(ag.working){
+        ag._t += delta/1000;
+        const a=0.45+0.35*Math.sin(ag._t*4);
+        ag.glow.setFillStyle(hex(ag.room.css), a);
+        ag.glow.setScale(1+0.15*Math.sin(ag._t*4));
+        ag.label.setColor(ag.room.css);
+      } else {
+        ag.glow.setFillStyle(hex(ag.room.css), 0);
+        ag.glow.setScale(1);
+        ag.label.setColor('#cfd6ee');
+      }
+    });
+  }
+}
+
+new Phaser.Game({
+  type:Phaser.AUTO, parent:'game', backgroundColor:'#070912', pixelArt:true,
+  scale:{ mode:Phaser.Scale.FIT, autoCenter:Phaser.Scale.CENTER_BOTH, width:HERO_W, height:HERO_H },
+  scene:Station
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  LIVE POLLING (same-origin /api/tasks → counts, working set, last result)
+// ─────────────────────────────────────────────────────────────────────────────
+function setBadge(live){
+  const c=document.getElementById('conn');
+  c.className='conn '+(live?'live':'demo');
+  document.getElementById('conn-text').textContent = live ? 'LIVE' : 'OFFLINE — no data';
+}
+async function poll(){
+  try{
+    const res=await fetch(API,{cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const tasks=await res.json();
+    const arr=Array.isArray(tasks)?tasks:[];
+    document.getElementById('s-tasks').textContent=arr.length;
+    document.getElementById('s-done').textContent=arr.filter(t=>t.status==='done').length;
+    const act=arr.filter(t=>ACTIVE_STATUSES.includes(t.status));
+    document.getElementById('s-active').textContent=act.length;
+
+    STATE.workingSet=new Set(act.map(t=>(t.assignee||'').toLowerCase()));
+    STATE.perAgent={};
+    ROOMS.filter(r=>r.agent).forEach(r=>{
+      const mine=arr.filter(t=>(t.assignee||'').toLowerCase()===r.id);
+      const cur=mine.find(t=>ACTIVE_STATUSES.includes(t.status));
+      const done=mine.filter(t=>t.status==='done').sort((a,b)=>String(b.completed_at||'').localeCompare(String(a.completed_at||'')))[0];
+      let summary='';
+      if(done&&done.result){ try{ const p=JSON.parse(done.result); summary=p.summary||p.output||JSON.stringify(p,null,2);}catch(e){ summary=String(done.result);} }
+      STATE.perAgent[r.id]={ working:STATE.workingSet.has(r.id), current: cur?('#'+cur.id+' · '+cur.type):null, last:summary };
+    });
+    STATE.live=true; setBadge(true);
+    if(openId) fillPanel(openId);
+  }catch(e){ STATE.live=false; setBadge(false); }
+}
+poll(); setInterval(poll, POLL_MS);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  DETAIL PANEL
+// ─────────────────────────────────────────────────────────────────────────────
+let openId=null;
+const ov=document.getElementById('ov'), panel=document.getElementById('panel');
+function openPanel(id){ openId=id; ov.classList.add('show'); panel.classList.add('show'); fillPanel(id); }
+function closePanel(){ openId=null; ov.classList.remove('show'); panel.classList.remove('show'); }
+ov.addEventListener('click', closePanel);
+document.getElementById('closeX').addEventListener('click', closePanel);
+function fillPanel(id){
+  const r=ROOM_BY_ID[id]; if(!r) return;
+  panel.style.setProperty('--accent', r.css);
+  document.getElementById('d-name').textContent=r.name;
+  document.getElementById('d-role').textContent=r.role;
+  const st=document.getElementById('d-status'), cur=document.getElementById('d-current'), rep=document.getElementById('d-report');
+  if(!r.agent){ st.className='pill idle'; st.textContent='STANDBY';
+    cur.textContent='War Room is a strategy view — it is not assigned tasks.';
+    rep.className='report empty'; rep.textContent='—'; return; }
+  const s=STATE.perAgent[id]||{};
+  if(s.working){ st.className='pill work'; st.textContent='WORKING'; st.style.background=r.css; st.style.borderColor=r.css; }
+  else { st.className='pill idle'; st.textContent='IDLE'; st.style.background='transparent'; }
+  cur.textContent = s.working ? (s.current||'Working…') : 'Nothing running right now.';
+  if(s.last){ rep.className='report'; rep.textContent=s.last; }
+  else { rep.className='report empty'; rep.textContent='No completed tasks yet.'; }
+}
+</script>
+</body>
+</html>
