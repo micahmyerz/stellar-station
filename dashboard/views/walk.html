@@ -8,12 +8,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
 <style>
-  :root{ --ink:#e8ecf8; --dim:#8a93b2; --line:rgba(255,255,255,.10); --panel:#0c1022; }
+  :root{ --ink:#e8ecf8; --dim:#8a93b2; --line:rgba(255,255,255,.10); }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:#070912;color:var(--ink);
     font-family:"Space Mono",ui-monospace,monospace;overflow:hidden}
   #game{position:fixed;inset:0}
-  /* HUD */
   #hud{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;
     justify-content:space-between;gap:12px;padding:14px 18px;pointer-events:none}
   .title{font-family:"Press Start 2P",monospace;font-size:15px;letter-spacing:1px;
@@ -36,7 +35,16 @@
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
   #hint{position:fixed;bottom:10px;left:0;right:0;z-index:20;text-align:center;
     color:var(--dim);font-size:10px;letter-spacing:.5px;pointer-events:none}
-  /* detail panel */
+  #setup{position:fixed;bottom:0;left:0;right:0;z-index:60;background:rgba(8,11,22,.94);
+    border-top:1px solid var(--line);padding:12px 16px;display:none;align-items:center;
+    gap:14px;flex-wrap:wrap;backdrop-filter:blur(6px);font-size:12px}
+  #setup.show{display:flex}
+  #setup b{color:#ffd34d}
+  #setup code{background:#0a0e1c;border:1px solid var(--line);border-radius:6px;
+    padding:8px 10px;font-size:11px;color:#9fe7c4;max-width:60vw;overflow:auto;white-space:pre}
+  #setup button{background:#1b2540;color:#cfe0ff;border:1px solid var(--line);
+    border-radius:7px;padding:8px 12px;font-family:inherit;font-size:11px;cursor:pointer}
+  #setup button:hover{background:#243156}
   #ov{position:fixed;inset:0;background:rgba(3,5,12,.55);backdrop-filter:blur(3px);z-index:30;
     opacity:0;pointer-events:none;transition:opacity .2s}
   #ov.show{opacity:1;pointer-events:auto}
@@ -56,7 +64,7 @@
   .pill.work{color:#06210f;font-weight:700}
   .pill.idle{color:var(--dim)}
   .report{background:#0a0e1c;border:1px solid var(--line);border-radius:10px;padding:13px;
-    font-size:12px;line-height:1.6;white-space:pre-wrap;color:#cfd6ee;max-height:320px;overflow:auto}
+    font-size:12px;line-height:1.6;white-space:pre-wrap;color:#cfd6ee;max-height:300px;overflow:auto}
   .report.empty{color:var(--dim);font-style:italic}
 </style>
 </head>
@@ -71,7 +79,13 @@
   </div>
 </div>
 <div id="game"></div>
-<div id="hint">Click any room to see what that agent is doing and what it last produced.</div>
+<div id="hint">Click an agent to see what it is doing and what it last produced.</div>
+
+<div id="setup">
+  <b>SETUP MODE</b> — drag each agent to the middle of its room, then Copy and paste the coordinates back to Claude.
+  <button id="copyBtn">Copy coordinates</button>
+  <code id="coords">…</code>
+</div>
 
 <div id="ov"></div>
 <aside id="panel">
@@ -84,207 +98,154 @@
 </aside>
 
 <script>
-// ─────────────────────────────────────────────────────────────────────────────
-//  CONFIG
-// ─────────────────────────────────────────────────────────────────────────────
-const HERO_W = 1672, HERO_H = 941;
-const HERO_URL   = "/rooms/hero-bg.png";    // served by the dashboard (public/rooms)
-const PLAYER_URL = "/Player.png";           // Cute Fantasy sprite — gitignored, scp'd to public/
-const API        = "/api/tasks";            // same-origin: full task rows
-const POLL_MS    = 3000;
-const SPEED      = 70;                       // px/sec walk speed (native coords)
-const SPRITE_SCALE = 1.7;
-const ACTIVE_STATUSES = ["in_progress","assigned","running"];
+const HERO_W=2560, HERO_H=1428;
+const HERO_URL="/rooms/hero-bg-v3.png";
+const PLAYER_URL="/Player.png";
+const API="/api/tasks";
+const POLL_MS=3000;
+const ACTIVE_STATUSES=["in_progress","assigned","running"];
+const SETUP=new URLSearchParams(location.search).has("setup");
+const ROWS={idleDown:0,idleSide:6,idleUp:12,walkDown:18,walkSide:24,walkUp:30};
+const SPRITE_SCALE=2.6, SPEED=90;
 
-// frame rows on Player.png (6 cols each): 0 idleDn 1 idleSide 2 idleUp 3 walkDn 4 walkSide 5 walkUp
-const ROWS = { idleDown:0, idleSide:6, idleUp:12, walkDown:18, walkSide:24, walkUp:30 };
-
-// rooms with native-coord walkable floor rects (read off the hero), agent mapping + accent
-const ROOMS = [
-  {id:"vega",   name:"VEGA RESEARCH",   role:"Research",    css:"#46e5a0", agent:true,  floor:{x1:260,y1:235,x2:485,y2:350}},
-  {id:"lyra",   name:"LYRA COPY",       role:"Copywriting", css:"#ffb23e", agent:true,  floor:{x1:585,y1:235,x2:800,y2:350}},
-  {id:"atlas",  name:"ATLAS COMMAND",   role:"Manager",     css:"#5bc8ff", agent:true,  floor:{x1:910,y1:235,x2:1150,y2:350}},
-  {id:"nova",   name:"NOVA MARKETING",  role:"Marketing",   css:"#ff5bd0", agent:true,  floor:{x1:260,y1:520,x2:470,y2:685}},
-  {id:"warroom",name:"WAR ROOM",        role:"Strategy",    css:"#ff4d6d", agent:false, floor:{x1:590,y1:520,x2:795,y2:685}},
-  {id:"pulsar", name:"PULSAR ANALYTICS",role:"Analytics",   css:"#7cff5b", agent:true,  floor:{x1:915,y1:520,x2:1130,y2:685}},
+const ROOMS=[
+  {id:"vega",   name:"VEGA RESEARCH",   role:"Research",    css:"#46e5a0", agent:true,  x:560,  y:380,  wander:170},
+  {id:"lyra",   name:"LYRA COPY",       role:"Copywriting", css:"#ffb23e", agent:true,  x:1280, y:380,  wander:170},
+  {id:"atlas",  name:"ATLAS COMMAND",   role:"Manager",     css:"#5bc8ff", agent:true,  x:1980, y:380,  wander:170},
+  {id:"nova",   name:"NOVA MARKETING",  role:"Marketing",   css:"#ff5bd0", agent:true,  x:560,  y:980,  wander:170},
+  {id:"warroom",name:"WAR ROOM",        role:"Strategy",    css:"#ff4d6d", agent:false, x:1280, y:980,  wander:170},
+  {id:"pulsar", name:"PULSAR ANALYTICS",role:"Analytics",   css:"#7cff5b", agent:true,  x:1980, y:980,  wander:170},
 ];
-const ROOM_BY_ID = Object.fromEntries(ROOMS.map(r=>[r.id,r]));
-function hex(css){ return parseInt(css.replace('#',''),16); }
+const ROOM_BY_ID=Object.fromEntries(ROOMS.map(r=>[r.id,r]));
+const hex=c=>parseInt(c.replace('#',''),16);
+const STATE={live:false,workingSet:new Set(),perAgent:{}};
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  SHARED LIVE STATE (written by the poller, read by Phaser)
-// ─────────────────────────────────────────────────────────────────────────────
-const STATE = { live:false, workingSet:new Set(), perAgent:{} };
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  PHASER SCENE
-// ─────────────────────────────────────────────────────────────────────────────
-class Station extends Phaser.Scene {
-  constructor(){ super('station'); this.agents=[]; }
-  preload(){
-    this.load.image('hero', HERO_URL);
-    this.load.spritesheet('player', PLAYER_URL, { frameWidth:32, frameHeight:32 });
-  }
+class Station extends Phaser.Scene{
+  constructor(){super('station');this.agents=[];}
+  preload(){this.load.image('hero',HERO_URL);
+    this.load.spritesheet('player',PLAYER_URL,{frameWidth:32,frameHeight:32});}
   create(){
-    this.add.image(0,0,'hero').setOrigin(0,0).setDisplaySize(HERO_W, HERO_H);
+    this.add.image(0,0,'hero').setOrigin(0,0).setDisplaySize(HERO_W,HERO_H);
+    const mk=(k,s)=>this.anims.create({key:k,frameRate:8,repeat:-1,
+      frames:this.anims.generateFrameNumbers('player',{start:s,end:s+5})});
+    mk('idle-down',ROWS.idleDown);mk('idle-side',ROWS.idleSide);mk('idle-up',ROWS.idleUp);
+    mk('walk-down',ROWS.walkDown);mk('walk-side',ROWS.walkSide);mk('walk-up',ROWS.walkUp);
 
-    const mk = (key, start)=> this.anims.create({
-      key, frameRate:8, repeat:-1,
-      frames:this.anims.generateFrameNumbers('player',{ start, end:start+5 })
-    });
-    mk('idle-down',ROWS.idleDown); mk('idle-side',ROWS.idleSide); mk('idle-up',ROWS.idleUp);
-    mk('walk-down',ROWS.walkDown); mk('walk-side',ROWS.walkSide); mk('walk-up',ROWS.walkUp);
-
-    // room name labels + clickable zones
     ROOMS.forEach(r=>{
-      const f=r.floor;
-      this.add.text(f.x1+4, f.y1-22, r.name, {
-        fontFamily:'monospace', fontSize:'13px', color:r.css, fontStyle:'bold'
-      }).setStroke('#05070f', 4).setShadow(0,0,r.css,6).setDepth(50);
-      const zone=this.add.rectangle((f.x1+f.x2)/2,(f.y1+f.y2)/2, f.x2-f.x1, f.y2-f.y1, 0xffffff, 0)
-        .setInteractive({useHandCursor:true});
-      zone.on('pointerover', ()=> this.hoverRing(r,true));
-      zone.on('pointerout',  ()=> this.hoverRing(r,false));
-      zone.on('pointerdown', ()=> openPanel(r.id));
-      r._hover=this.add.rectangle((f.x1+f.x2)/2,(f.y1+f.y2)/2, f.x2-f.x1, f.y2-f.y1)
-        .setStrokeStyle(2, hex(r.css), 0).setDepth(49);
-    });
-
-    // spawn agent sprites
-    ROOMS.filter(r=>r.agent).forEach(r=>{
-      const f=r.floor, cx=(f.x1+f.x2)/2, cy=(f.y1+f.y2)/2;
-      const glow=this.add.ellipse(cx,cy+12, 40,14, hex(r.css), 0.0).setDepth(9);
-      const shadow=this.add.ellipse(cx,cy+13, 26,8, 0x000000, 0.45).setDepth(9);
-      const spr=this.add.sprite(cx,cy,'player').setScale(SPRITE_SCALE).setDepth(10);
+      const glow=this.add.ellipse(r.x,r.y+22,60,20,hex(r.css),0).setDepth(9);
+      const shadow=this.add.ellipse(r.x,r.y+24,40,12,0x000000,0.45).setDepth(9);
+      const spr=this.add.sprite(r.x,r.y,'player').setScale(SPRITE_SCALE).setDepth(10);
       spr.play('idle-down');
-      const label=this.add.text(cx, cy-30, r.id.toUpperCase(), {
-        fontFamily:'monospace', fontSize:'11px', color:'#fff', fontStyle:'bold'
-      }).setOrigin(0.5).setStroke('#05070f',4).setDepth(11);
-      this.agents.push({ id:r.id, room:r, sprite:spr, label, glow, shadow,
-        facing:'down', moving:false, working:false, _t:0 });
+      const label=this.add.text(r.x,r.y-46,r.id.toUpperCase(),{fontFamily:'monospace',
+        fontSize:'15px',color:'#fff',fontStyle:'bold'}).setOrigin(0.5).setStroke('#05070f',5).setDepth(11);
+      const ag={room:r,id:r.id,sprite:spr,label,glow,shadow,home:{x:r.x,y:r.y},
+        facing:'down',moving:false,working:false,_t:0};
+      this.agents.push(ag);
+      if(SETUP){ spr.setInteractive({useHandCursor:true,draggable:true}); this.input.setDraggable(spr); }
+      else { spr.setInteractive({useHandCursor:true}); spr.on('pointerdown',()=>openPanel(r.id)); }
     });
 
-    // wander/work brain
-    this.time.addEvent({ delay:1300, loop:true, callback:()=>this.brain() });
+    if(SETUP){
+      document.getElementById('setup').classList.add('show');
+      document.getElementById('hint').style.display='none';
+      this.input.on('drag',(p,obj,dx,dy)=>{obj.x=dx;obj.y=dy;
+        const ag=this.agents.find(a=>a.sprite===obj); if(ag)ag.label.setPosition(dx,dy-46); updateCoords(this);});
+      updateCoords(this);
+    } else {
+      this.time.addEvent({delay:1400,loop:true,callback:()=>this.brain()});
+    }
   }
-
-  hoverRing(r,on){ if(r._hover) r._hover.setStrokeStyle(2, hex(r.css), on?0.9:0); }
-
   brain(){
-    this.agents.forEach(ag=>{
-      ag.working = STATE.workingSet.has(ag.id);
-      if(ag.moving) return;
-      const f=ag.room.floor;
-      if(ag.working){
-        // gravitate to the room's desk (center-ish) while working
-        const cx=(f.x1+f.x2)/2, cy=(f.y1+f.y2)/2;
-        if(Phaser.Math.Distance.Between(ag.sprite.x,ag.sprite.y,cx,cy)>14) this.moveTo(ag,cx,cy);
-      } else if(Math.random()<0.55){
-        this.moveTo(ag, Phaser.Math.Between(f.x1+12,f.x2-12), Phaser.Math.Between(f.y1+12,f.y2-12));
-      }
+    this.agents.filter(a=>a.room.agent).forEach(ag=>{
+      ag.working=STATE.workingSet.has(ag.id);
+      if(ag.moving)return;
+      const h=ag.home,w=ag.room.wander;
+      if(ag.working){ if(Phaser.Math.Distance.Between(ag.sprite.x,ag.sprite.y,h.x,h.y)>16) this.moveTo(ag,h.x,h.y); }
+      else if(Math.random()<0.55){ this.moveTo(ag, h.x+Phaser.Math.Between(-w,w), h.y+Phaser.Math.Between(-w*0.55,w*0.55)); }
     });
   }
-
   moveTo(ag,tx,ty){
-    const dx=tx-ag.sprite.x, dy=ty-ag.sprite.y, dist=Math.hypot(dx,dy);
-    if(dist<4) return;
+    const dx=tx-ag.sprite.x,dy=ty-ag.sprite.y,dist=Math.hypot(dx,dy); if(dist<4)return;
     ag.moving=true;
-    if(Math.abs(dx)>Math.abs(dy)){ ag.sprite.play('walk-side',true); ag.sprite.setFlipX(dx<0); ag.facing=dx<0?'left':'right'; }
-    else { ag.sprite.play(dy<0?'walk-up':'walk-down',true); ag.facing=dy<0?'up':'down'; }
-    this.tweens.add({ targets:ag.sprite, x:tx, y:ty, duration:(dist/SPEED)*1000, ease:'Linear',
-      onComplete:()=>{ ag.moving=false; this.idle(ag); } });
+    if(Math.abs(dx)>Math.abs(dy)){ag.sprite.play('walk-side',true);ag.sprite.setFlipX(dx<0);ag.facing=dx<0?'left':'right';}
+    else{ag.sprite.play(dy<0?'walk-up':'walk-down',true);ag.facing=dy<0?'up':'down';}
+    this.tweens.add({targets:ag.sprite,x:tx,y:ty,duration:(dist/SPEED)*1000,ease:'Linear',
+      onComplete:()=>{ag.moving=false;this.idle(ag);}});
   }
-  idle(ag){
-    if(ag.facing==='up') ag.sprite.play('idle-up',true);
-    else if(ag.facing==='down') ag.sprite.play('idle-down',true);
-    else { ag.sprite.play('idle-side',true); ag.sprite.setFlipX(ag.facing==='left'); }
-  }
-
-  update(time, delta){
+  idle(ag){ if(ag.facing==='up')ag.sprite.play('idle-up',true);
+    else if(ag.facing==='down')ag.sprite.play('idle-down',true);
+    else{ag.sprite.play('idle-side',true);ag.sprite.setFlipX(ag.facing==='left');} }
+  update(t,dt){
     this.agents.forEach(ag=>{
-      ag.label.setPosition(ag.sprite.x, ag.sprite.y-30);
-      ag.glow.setPosition(ag.sprite.x, ag.sprite.y+12);
-      ag.shadow.setPosition(ag.sprite.x, ag.sprite.y+13);
-      if(ag.working){
-        ag._t += delta/1000;
-        const a=0.45+0.35*Math.sin(ag._t*4);
-        ag.glow.setFillStyle(hex(ag.room.css), a);
-        ag.glow.setScale(1+0.15*Math.sin(ag._t*4));
-        ag.label.setColor(ag.room.css);
-      } else {
-        ag.glow.setFillStyle(hex(ag.room.css), 0);
-        ag.glow.setScale(1);
-        ag.label.setColor('#cfd6ee');
-      }
+      ag.label.setPosition(ag.sprite.x,ag.sprite.y-46);
+      ag.glow.setPosition(ag.sprite.x,ag.sprite.y+22);
+      ag.shadow.setPosition(ag.sprite.x,ag.sprite.y+24);
+      if(ag.working){ag._t+=dt/1000;const a=0.45+0.35*Math.sin(ag._t*4);
+        ag.glow.setFillStyle(hex(ag.room.css),a);ag.glow.setScale(1+0.15*Math.sin(ag._t*4));ag.label.setColor(ag.room.css);}
+      else{ag.glow.setFillStyle(hex(ag.room.css),0);ag.glow.setScale(1);ag.label.setColor('#fff');}
     });
   }
 }
 
-new Phaser.Game({
-  type:Phaser.AUTO, parent:'game', backgroundColor:'#070912', pixelArt:true,
-  scale:{ mode:Phaser.Scale.FIT, autoCenter:Phaser.Scale.CENTER_BOTH, width:HERO_W, height:HERO_H },
-  scene:Station
+function updateCoords(scene){
+  const lines=scene.agents.map(a=>`{id:"${a.id}", x:${Math.round(a.sprite.x)}, y:${Math.round(a.sprite.y)}}`);
+  document.getElementById('coords').textContent=lines.join('\n');
+}
+document.getElementById('copyBtn').addEventListener('click',()=>{
+  const txt=document.getElementById('coords').textContent;
+  navigator.clipboard.writeText(txt).then(()=>{const b=document.getElementById('copyBtn');
+    b.textContent='Copied!';setTimeout(()=>b.textContent='Copy coordinates',1500);});
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  LIVE POLLING (same-origin /api/tasks → counts, working set, last result)
-// ─────────────────────────────────────────────────────────────────────────────
-function setBadge(live){
-  const c=document.getElementById('conn');
+new Phaser.Game({type:Phaser.AUTO,parent:'game',backgroundColor:'#070912',pixelArt:true,
+  scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH,width:HERO_W,height:HERO_H},scene:Station});
+
+function setBadge(live){const c=document.getElementById('conn');
   c.className='conn '+(live?'live':'demo');
-  document.getElementById('conn-text').textContent = live ? 'LIVE' : 'OFFLINE — no data';
-}
+  document.getElementById('conn-text').textContent=live?'LIVE':'OFFLINE — no data';}
 async function poll(){
   try{
-    const res=await fetch(API,{cache:'no-store'});
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const tasks=await res.json();
-    const arr=Array.isArray(tasks)?tasks:[];
-    document.getElementById('s-tasks').textContent=arr.length;
-    document.getElementById('s-done').textContent=arr.filter(t=>t.status==='done').length;
-    const act=arr.filter(t=>ACTIVE_STATUSES.includes(t.status));
+    const res=await fetch(API,{cache:'no-store'}); if(!res.ok)throw 0;
+    const arr=await res.json(); const tasks=Array.isArray(arr)?arr:[];
+    document.getElementById('s-tasks').textContent=tasks.length;
+    document.getElementById('s-done').textContent=tasks.filter(t=>t.status==='done').length;
+    const act=tasks.filter(t=>ACTIVE_STATUSES.includes(t.status));
     document.getElementById('s-active').textContent=act.length;
-
     STATE.workingSet=new Set(act.map(t=>(t.assignee||'').toLowerCase()));
     STATE.perAgent={};
     ROOMS.filter(r=>r.agent).forEach(r=>{
-      const mine=arr.filter(t=>(t.assignee||'').toLowerCase()===r.id);
+      const mine=tasks.filter(t=>(t.assignee||'').toLowerCase()===r.id);
       const cur=mine.find(t=>ACTIVE_STATUSES.includes(t.status));
       const done=mine.filter(t=>t.status==='done').sort((a,b)=>String(b.completed_at||'').localeCompare(String(a.completed_at||'')))[0];
-      let summary='';
-      if(done&&done.result){ try{ const p=JSON.parse(done.result); summary=p.summary||p.output||JSON.stringify(p,null,2);}catch(e){ summary=String(done.result);} }
-      STATE.perAgent[r.id]={ working:STATE.workingSet.has(r.id), current: cur?('#'+cur.id+' · '+cur.type):null, last:summary };
+      let s=''; if(done&&done.result){try{const p=JSON.parse(done.result);s=p.summary||p.output||JSON.stringify(p,null,2);}catch(e){s=String(done.result);}}
+      STATE.perAgent[r.id]={working:STATE.workingSet.has(r.id),current:cur?('#'+cur.id+' · '+cur.type):null,last:s};
     });
-    STATE.live=true; setBadge(true);
-    if(openId) fillPanel(openId);
+    STATE.live=true; setBadge(true); if(openId)fillPanel(openId);
   }catch(e){ STATE.live=false; setBadge(false); }
 }
-poll(); setInterval(poll, POLL_MS);
+poll(); setInterval(poll,POLL_MS);
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  DETAIL PANEL
-// ─────────────────────────────────────────────────────────────────────────────
 let openId=null;
-const ov=document.getElementById('ov'), panel=document.getElementById('panel');
-function openPanel(id){ openId=id; ov.classList.add('show'); panel.classList.add('show'); fillPanel(id); }
-function closePanel(){ openId=null; ov.classList.remove('show'); panel.classList.remove('show'); }
-ov.addEventListener('click', closePanel);
-document.getElementById('closeX').addEventListener('click', closePanel);
+const ov=document.getElementById('ov'),panel=document.getElementById('panel');
+function openPanel(id){openId=id;ov.classList.add('show');panel.classList.add('show');fillPanel(id);}
+function closePanel(){openId=null;ov.classList.remove('show');panel.classList.remove('show');}
+ov.addEventListener('click',closePanel);
+document.getElementById('closeX').addEventListener('click',closePanel);
 function fillPanel(id){
-  const r=ROOM_BY_ID[id]; if(!r) return;
-  panel.style.setProperty('--accent', r.css);
+  const r=ROOM_BY_ID[id]; if(!r)return;
+  panel.style.setProperty('--accent',r.css);
   document.getElementById('d-name').textContent=r.name;
   document.getElementById('d-role').textContent=r.role;
-  const st=document.getElementById('d-status'), cur=document.getElementById('d-current'), rep=document.getElementById('d-report');
-  if(!r.agent){ st.className='pill idle'; st.textContent='STANDBY';
+  const st=document.getElementById('d-status'),cur=document.getElementById('d-current'),rep=document.getElementById('d-report');
+  if(!r.agent){st.className='pill idle';st.textContent='STANDBY';
     cur.textContent='War Room is a strategy view — it is not assigned tasks.';
-    rep.className='report empty'; rep.textContent='—'; return; }
+    rep.className='report empty';rep.textContent='—';return;}
   const s=STATE.perAgent[id]||{};
-  if(s.working){ st.className='pill work'; st.textContent='WORKING'; st.style.background=r.css; st.style.borderColor=r.css; }
-  else { st.className='pill idle'; st.textContent='IDLE'; st.style.background='transparent'; }
-  cur.textContent = s.working ? (s.current||'Working…') : 'Nothing running right now.';
-  if(s.last){ rep.className='report'; rep.textContent=s.last; }
-  else { rep.className='report empty'; rep.textContent='No completed tasks yet.'; }
+  if(s.working){st.className='pill work';st.textContent='WORKING';st.style.background=r.css;st.style.borderColor=r.css;}
+  else{st.className='pill idle';st.textContent='IDLE';st.style.background='transparent';}
+  cur.textContent=s.working?(s.current||'Working…'):'Nothing running right now.';
+  if(s.last){rep.className='report';rep.textContent=s.last;}
+  else{rep.className='report empty';rep.textContent='No completed tasks yet.';}
 }
 </script>
 </body>
